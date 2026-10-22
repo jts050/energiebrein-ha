@@ -32,6 +32,8 @@ class Brein:
         self.logboek = Logboek(data_map(cfg) / "logboek.db")
         self.huis.logboek = self.logboek
         self._storingen_vorig: dict | None = None
+        from .telefoon import Telefoon
+        self.telefoon = Telefoon(cfg)
         lp = cfg.get("laadpaal", {})
         self.bed = Bediening(auto_doel_kwh=lp.get("standaard_doel_kwh", 20), auto_vertrek=lp.get("standaard_vertrek", "07:30"))
         from .autoplan import AutoPlan
@@ -415,9 +417,13 @@ class Brein:
         for titel, x in nu.items():
             if titel not in vorig:
                 self.logboek.schrijf("storing", f"{titel}. {x['uitleg']}", x.get("apparaat"))
+                if self._storingen_vorig is not None:  # niet bij het opstarten alles opnieuw melden
+                    self.telefoon.meld(titel, f"Energiebrein: {titel}", x["uitleg"], belangrijk=x["ernst"] == "fout")
         for titel, x in vorig.items():
             if titel not in nu:
                 self.logboek.schrijf("opgelost", f"Opgelost: {titel}", x.get("apparaat"))
+                if self.telefoon.bij_opgelost:
+                    self.telefoon.meld(titel, "Energiebrein: opgelost", titel)
         self._storingen_vorig = nu
 
     # ------------------------------------------------------------ voor de app

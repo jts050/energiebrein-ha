@@ -38,6 +38,7 @@ INSTELBAAR = {
     "warmtepomp": ["type", "relais1", "relais2", "meter", "vermogen_kw", "jaarverbruik_kwh", "blokkeer_uren_per_dag", "max_wacht_achter_elkaar_uur", "niet_wachten_onder_c", "comfort_tijden"],
     "huis": ["jaarverbruik_kwh"],
     "auto": ["merk", "gebruiker", "wachtwoord", "spin", "vin"],
+    "meldingen": ["telefoon", "bij_opgelost"],
 }
 
 
@@ -282,6 +283,25 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
             raise HTTPException(502, f"Aanpassen lukt niet: {e}")
         B().logboek.schrijf("handmatig", f"Ondergrens van de accu in de omvormer op {pct}% gezet", "omvormer")
         return {"ok": True, "tekst": f"De accu mag nu tot {pct}% ontladen.", "status": B().status()}
+
+    @app.get("/api/telefoon")
+    async def telefoon_info():
+        from . import telefoon
+        if not telefoon.beschikbaar():
+            return {"beschikbaar": False, "diensten": []}
+        try:
+            return {"beschikbaar": True, "diensten": await telefoon.diensten()}
+        except Exception as e:
+            return {"beschikbaar": True, "diensten": [], "fout": str(e)}
+
+    @app.post("/api/telefoon/test")
+    async def telefoon_test(body: dict):
+        from . import telefoon
+        try:
+            await telefoon.stuur(str(body.get("dienst") or ""), "Energiebrein", "Testmelding: je telefoon is gekoppeld.")
+        except Exception as e:
+            raise HTTPException(400, str(e))
+        return {"ok": True}
 
     @app.get("/api/logboek")
     async def logboek(dagen: int = 7, soort: str = ""):

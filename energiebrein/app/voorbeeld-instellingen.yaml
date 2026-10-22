@@ -110,3 +110,9 @@ auto:
   wachtwoord: ""
   spin: ""                # alleen nodig bij sommige merken (S-PIN)
   vin: ""                 # leeg = de eerste auto op je account
+
+# Meldingen op je telefoon via de Home Assistant-app (werkt alleen als Energiebrein in Home Assistant draait).
+# Kies je telefoon in de app bij Koppelen → Telefoon, of vul de notify-dienst zelf in, bijvoorbeeld mobile_app_iphone_van_jordy.
+meldingen:
+  telefoon: ""
+  bij_opgelost: true
