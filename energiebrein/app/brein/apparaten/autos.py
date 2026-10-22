@@ -101,11 +101,29 @@ class AutoAccount:
         except ImportError:
             self.fout = "de koppeling met automerken is nog niet geïnstalleerd (pip install carconnectivity-connector-" + self.merk + ")"
         except Exception as e:
-            tekst = str(e) or type(e).__name__
-            if "auth" in tekst.lower() or "password" in tekst.lower() or "login" in tekst.lower() or "401" in tekst:
-                tekst = "inloggen lukt niet; controleer e-mail en wachtwoord van je " + MERKEN[self.merk].split(" (")[0] + "-account"
-            elif "consent" in tekst.lower() or "terms" in tekst.lower():
-                tekst = "je moet eerst nieuwe voorwaarden accepteren in de app van je auto; open die app en log één keer in"
+            ruw = (str(e) or type(e).__name__).strip()
+            l = ruw.lower()
+            merk = MERKEN[self.merk].split(" (")[0]
+            if "consent" in l or "terms" in l or "legal" in l or "marketing" in l:
+                tekst = (f"je moet eerst nieuwe voorwaarden accepteren: open de app van {merk} op je telefoon, log uit en weer in "
+                         "en accepteer wat hij vraagt")
+            elif "throttl" in l or "too many" in l or "429" in l:
+                tekst = f"{merk} blokkeert even, door te vaak inloggen. Wacht een uur en druk dan pas weer op Test"
+            elif "spin" in l:
+                tekst = "de S-PIN klopt niet of is nodig; vul de S-PIN uit de app van je auto in"
+            elif any(w in l for w in ("auth", "password", "login", "credential", "401", "403")):
+                tekst = (f"inloggen bij {merk} lukt niet. Klopt het wachtwoord, open dan de app van je auto en kijk of hij "
+                         "nieuwe voorwaarden wil laten accepteren")
+            else:
+                tekst = f"uitlezen bij {merk} lukt niet"
+            tekst += f" (melding van {merk}: {ruw[:180]})"
+            # een oude of halve inlog weggooien, zodat de volgende poging schoon begint
+            self.stop()
+            self.cc = None
+            try:
+                (self.map / f"auto_{self.merk}.token").unlink(missing_ok=True)
+            except Exception:
+                pass
             self.fout = tekst
             log.warning("Auto uitlezen mislukt: %s", tekst)
         finally:
