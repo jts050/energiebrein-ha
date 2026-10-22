@@ -811,6 +811,10 @@ class TeslaWallConnector:
 
 
 # ======================= Easee (via de Easee-cloud) =======================
+class Easee403(RuntimeError):
+    pass
+
+
 class Easee:
     """Easee-laders hebben geen lokale instellingen of API; uitlezen en sturen gaat via je Easee-account (api.easee.com),
     net als bij de Home Assistant- en openHAB-koppelingen. We vragen de status hooguit elke 30 seconden op en
@@ -890,16 +894,18 @@ class Easee:
                     self._zet_token(await r.json(content_type=None))
             except Exception:
                 await self._login()
-        kop = {"Authorization": f"Bearer {self.token}", "Accept": "application/json"}
+        kop = {"Authorization": f"Bearer {self.token}", "Accept": "application/json",
+               "Content-Type": "application/json;charset=UTF-8", "User-Agent": "Energiebrein/1.1 (+https://accumaatje.nl)"}
         async with self.sessie.request(methode, self.API + pad, json=json, headers=kop) as r:
             if r.status == 401:
                 self.token = None
             if r.status == 429:
                 raise RuntimeError("Easee vraagt even rustiger aan te doen (te veel verzoeken); het brein probeert het zo opnieuw.")
             if r.status == 403:
-                raise RuntimeError(f"inloggen bij Easee lukt, maar dit account mag lader {self.lader_id} niet uitlezen of sturen (403). "
-                                   "Meestal staat de lader op een ander account, bijvoorbeeld dat van de installateur. Log in met het account "
-                                   "dat eigenaar is, of laat jezelf in de Easee-app als beheerder toevoegen (lader → Instellingen → Toegang).")
+                antw = (await r.text())[:160].strip().replace("\n", " ")
+                log.warning("Easee 403 op %s %s: %s", methode, pad, antw)
+                raise Easee403(f"Easee weigert {methode} {pad} (403){': ' + antw if antw else ''}. Je bent wel ingelogd. "
+                               "Ben je in het Easee-portaal eigenaar van de lader, stuur deze melding dan door.")
             r.raise_for_status()
             tekst = await r.text()
             return _json.loads(tekst) if tekst.strip() else {}
@@ -908,7 +914,10 @@ class Easee:
         nu = datetime.now(timezone.utc)
         tijd, d = self._cache
         if not d or (nu - tijd).total_seconds() >= 30:
-            d = await self._vraag("GET", f"/chargers/{self.lader_id}/state")
+            try:
+                d = await self._vraag("GET", f"/chargers/{self.lader_id}/state")
+            except Easee403:
+                d = await self._vraag("GET", f"/state/{self.lader_id}")  # oudere route, die pyeasee ook gebruikt
             self._cache = (nu, d)
         modus = int(d.get("chargerOpMode") or 0)
         return {"auto_kw": float(d.get("totalPower") or 0), "auto_verbonden": modus in self.VERBONDEN,
