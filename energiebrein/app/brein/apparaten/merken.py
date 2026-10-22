@@ -849,11 +849,20 @@ class Easee:
             raise
         except Exception as e:
             raise RuntimeError(f"de Easee-cloud is niet bereikbaar ({uitleg(e)}). Heeft dit apparaat internet?")
+        try:
+            lijst = await self._vraag("GET", "/chargers") or []
+        except RuntimeError:
+            lijst = None
+        ids = [str(x.get("id", "")).upper() for x in (lijst or [])]
+        if lijst is not None and not ids:
+            raise RuntimeError("inloggen bij Easee lukt, maar er staat geen enkele lader op dit account. De lader is dan aan een ander "
+                               "account gekoppeld (vaak van de installateur of van wie hem eerst registreerde). Vraag die persoon je in de "
+                               "Easee-app toe te voegen (lader → Instellingen → Toegang), of laat Easee-support de lader op jouw account zetten.")
         if not self.lader_id:
-            lijst = await self._vraag("GET", "/chargers")
-            if not lijst:
-                raise RuntimeError("Er staat geen lader op dit Easee-account.")
-            self.lader_id = lijst[0]["id"]
+            self.lader_id = ids[0]
+        elif ids and self.lader_id not in ids:
+            raise RuntimeError(f"op dit Easee-account staat niet lader {self.lader_id}, maar {', '.join(ids)}. "
+                               "Controleer het serienummer (8 tekens, staat in de Easee-app en op de sticker) of laat het veld leeg.")
         log.info("Easee gekoppeld: lader %s", self.lader_id)
 
     async def stop(self):
