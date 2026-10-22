@@ -1,0 +1,13 @@
+# Tarieven van dynamische energiecontracten bovenop de beursprijs.
+# opslag en terugleverkosten: € per kWh excl. btw · vast: € per maand incl. btw
+# Opslag en vaste kosten: energiemorgen.nl, peildatum juni 2026.
+# Terugleverkosten zijn een schatting (leveranciers rekenen sinds 2026 per teruggeleverde kWh); controleer ze op je contract.
+peildatum: "juni 2026"
+leveranciers:
+  frank:      {naam: Frank Energie,       opslag: 0.015, vast: 7.49, terugleverkosten: 0.010, handel: "Slim handelen (onbalans)"}
+  anwb:       {naam: ANWB Energie,        opslag: 0.015, vast: 6.50, terugleverkosten: 0.015}
+  next:       {naam: NextEnergy,          opslag: 0.019, vast: 5.50, terugleverkosten: 0.010, handel: "Batterijsturing (onbalans)"}
+  energyzero: {naam: EnergyZero,          opslag: 0.021, vast: 6.95, terugleverkosten: 0.015}
+  zonneplan:  {naam: Zonneplan,           opslag: 0.023, vast: 5.95, terugleverkosten: 0.000, handel: "Powerplay (alleen eigen Nexus-accu)"}
+  tibber:     {naam: Tibber,              opslag: 0.0205, vast: 5.99, terugleverkosten: 0.0}   # factuur sept 2026: inkoopvergoeding 2,05 ct; bij teruglevering valt die weg tegen de verkoopvergoeding
+  vandebron:  {naam: Vandebron Dynamisch, opslag: 0.028, vast: 6.75, terugleverkosten: 0.015}

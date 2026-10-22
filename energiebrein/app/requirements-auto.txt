@@ -1,0 +1,8 @@
+# Niet verplicht: je auto koppelen (Volkswagen, Audi, Skoda, Seat/Cupra) om de laadstand te zien.
+# Apart, zodat een probleem hier de rest van Energiebrein nooit tegenhoudt.
+pyjwt>=2.13,<2.14
+carconnectivity
+carconnectivity-connector-volkswagen
+carconnectivity-connector-audi
+carconnectivity-connector-skoda
+carconnectivity-connector-seatcupra
