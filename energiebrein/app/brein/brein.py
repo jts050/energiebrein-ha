@@ -224,17 +224,29 @@ class Brein:
                          else "Voedt het huis (vasthouden kan bij dit merk nog niet, dus de accu helpt de auto mee)")
         elif k:
             vraag = k.huis_kwh + k.wp_kwh + k.auto_kwh - k.zon_kwh
-            if k.accu_actie == "laden" and vraag < -0.02:
+            # Wat het plan voor dit kwartier wil laden, en wat de zon NU echt over heeft. Het plan rekent met de
+            # zonvoorspelling; is het bewolkter dan verwacht, dan moet de rest uit het net komen, anders haalt de accu
+            # zijn doel niet en mis je straks de dure uren.
+            plan_kw = max(k.accu_kwh, 0.0) / 0.25 / math.sqrt(float(self.cfg["accu"].get("rendement", 0.9)))
+            overschot_nu = m.zon_kw - (m.huis_kw + m.wp_kw + m.auto_kw)
+            if k.accu_actie == "laden" and vraag < -0.02 and overschot_nu >= 0.8 * plan_kw:
                 await self.huis.accu("zelfverbruik")
                 b["accu"] = "Laadt met zonne-overschot"
+            elif k.accu_actie == "laden" and vraag < -0.02 and self.prijzen.bron == "model":
+                await self.huis.accu("zelfverbruik")
+                b["accu"] = "Laadt met wat de zon over heeft (minder zon dan verwacht; geen echte prijzen om uit het net bij te laden)"
             elif k.accu_actie == "laden" and self.prijzen.bron == "model":
                 # Zonder echte stroomprijzen nooit uit het net laden: het plan rekent dan met een geschat patroon.
                 await self.huis.accu("zelfverbruik")
                 b["accu"] = "Laadt niet uit het net: er zijn nu geen echte stroomprijzen"
             elif k.accu_actie == "laden":
-                kw = min(k.accu_kwh / 0.25 / math.sqrt(self.cfg["accu"]["rendement"]), self.cfg["accu"]["max_laden_kw"])
+                kw = min(plan_kw, self.cfg["accu"]["max_laden_kw"])
                 await self.huis.accu("laden", kw, k.soc_na)
-                b["accu"] = f"Laadt uit het net ({self._k(kw)} kW) tot {k.soc_na:.0f}%"
+                if vraag < -0.02:
+                    b["accu"] = (f"Laadt {self._k(kw)} kW tot {k.soc_na:.0f}%: minder zon dan verwacht "
+                                 f"({self._k(max(m.zon_kw, 0))} kW), de rest komt goedkoop uit het net")
+                else:
+                    b["accu"] = f"Laadt uit het net ({self._k(kw)} kW) tot {k.soc_na:.0f}%"
             elif k.accu_actie == "ontladen" and k.net_kwh < -0.02:
                 # Eerst het huis, dan pas terugleveren: wat het huis NU vraagt kost inkoopprijs, terugleveren levert
                 # alleen het (lagere) terugleverbedrag op. Het plan rekende met een verwacht verbruik; het echte
