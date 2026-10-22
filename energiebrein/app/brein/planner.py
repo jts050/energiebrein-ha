@@ -199,6 +199,7 @@ class Planner:
         lo, hi = cap * c["min_soc"] / 100, cap * c["max_soc"] / 100
         aftoppen_mag = self.cfg.get("omvormer", {}).get("aftoppen_bij_negatieve_prijs", True)
         eta = math.sqrt(c["rendement"])
+        slijt = float(c.get("slijtage_per_kwh", 0.02))    # slijtage van de accu per geladen kWh
         N = max(10, min(400, int((hi - lo) / 0.05)))
         stap = (hi - lo) / N
         up, dn = max(1, int(c["max_laden_kw"] * Q / stap)), max(1, int(c["max_ontladen_kw"] * Q / stap))
@@ -217,7 +218,7 @@ class Planner:
             d = deltas * stap
             g = netto + np.where(d > 0, d / eta, d * eta)                     # netstroom per keuze
             terug = 0.0 if (aftoppen_mag and k.teruglever < 0) else k.teruglever
-            kost = np.where(g > 0, g * k.inkoop, g * terug)                    # per keuze
+            kost = np.where(g > 0, g * k.inkoop, g * terug) + np.where(d > 0, d * slijt, 0.0)   # per keuze, incl. slijtage
             doel = idx[:, None] + deltas[None, :]                              # (N+1, keuzes)
             geldig = (doel >= 0) & (doel <= N)
             totaal = np.where(geldig, kost[None, :] + V[np.clip(doel, 0, N)], np.inf)

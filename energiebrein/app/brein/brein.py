@@ -193,6 +193,33 @@ class Brein:
         self._plan_nodig.set()
 
     # ------------------------------------------------------------ regelen
+
+    async def _eigen(self, m):
+        """'Eigen verbruik'. Standaard laat Energiebrein de omvormer dat zelf doen. In P1-regelmodus regelt Energiebrein de accu
+        zelf: de P1 moet op ongeveer 0 kW uitkomen, de CT-meter van de omvormer doet er dan niet meer toe."""
+        a = self.cfg["accu"]
+        if self.cfg["omvormer"].get("regel", "omvormer") != "p1" or not self.huis.p1 or not self.huis.kan_accu_sturen:
+            await self.huis.accu("zelfverbruik")
+            return
+        gewenst = m.accu_kw - m.net_kw                      # + laden: net > 0 (afname) betekent minder laden / meer ontladen
+        vorige = getattr(self, "_p1_vorige", 0.0)
+        gewenst = vorige + 0.7 * (gewenst - vorige)         # dempen, anders slingert het
+        if m.accu_soc >= float(a.get("max_soc", 100)) and gewenst > 0:
+            gewenst = 0.0
+        if m.accu_soc <= float(a.get("min_soc", 0)) and gewenst < 0:
+            gewenst = 0.0
+        gewenst = max(-a["max_ontladen_kw"], min(a["max_laden_kw"], gewenst))
+        kw = round(gewenst / 0.4) * 0.4                     # stapjes van 0,4 kW: niet elke paar seconden een nieuwe opdracht
+        self._p1_vorige = gewenst
+        self._p1_tekst = (f"P1-regeling: laadt {kw:.1f} kW".replace(".", ",") if kw > 0.01 else
+                          f"P1-regeling: levert {-kw:.1f} kW".replace(".", ",") if kw < -0.01 else "P1-regeling: accu rust")
+        if kw > 0.01:
+            await self.huis.accu("laden", kw, a.get("max_soc", 100))
+        elif kw < -0.01:
+            await self.huis.accu("ontladen", -kw)
+        else:
+            await self.huis.accu("vasthouden", 0, m.accu_soc)
+
     async def regel(self):
         m = await self.huis.lees()
         vorige_verbonden = self.meting.auto_verbonden if self.meting else False
@@ -209,6 +236,7 @@ class Brein:
             self.gesch.meet(m, inkoop, terug, dt, beurs)
 
         b = {}
+        self._p1_tekst = None
         # --- accu ---
         if self.bed.accu != "auto":
             actie = self.bed.accu
@@ -239,14 +267,14 @@ class Brein:
             plan_kw = max(k.accu_kwh, 0.0) / 0.25 / math.sqrt(float(self.cfg["accu"].get("rendement", 0.9)))
             overschot_nu = m.zon_kw - (m.huis_kw + m.wp_kw + m.auto_kw)
             if k.accu_actie == "laden" and vraag < -0.02 and overschot_nu >= 0.8 * plan_kw:
-                await self.huis.accu("zelfverbruik")
+                await self._eigen(m)
                 b["accu"] = "Laadt met zonne-overschot"
             elif k.accu_actie == "laden" and vraag < -0.02 and self.prijzen.bron == "model":
-                await self.huis.accu("zelfverbruik")
+                await self._eigen(m)
                 b["accu"] = "Laadt met wat de zon over heeft (minder zon dan verwacht; geen echte prijzen om uit het net bij te laden)"
             elif k.accu_actie == "laden" and self.prijzen.bron == "model":
                 # Zonder echte stroomprijzen nooit uit het net laden: het plan rekent dan met een geschat patroon.
-                await self.huis.accu("zelfverbruik")
+                await self._eigen(m)
                 b["accu"] = "Laadt niet uit het net: er zijn nu geen echte stroomprijzen"
             elif k.accu_actie == "laden":
                 kw = min(plan_kw, self.cfg["accu"]["max_laden_kw"])
@@ -275,29 +303,31 @@ class Brein:
                 kw = min(self.cfg["accu"]["max_ontladen_kw"], vraag_nu + plan_terug)
                 kw = max(round(kw / 0.4) * 0.4, 0.4)            # in stapjes van 0,4 kW, zodat de omvormer niet elke 10 s een nieuwe opdracht krijgt
                 if plan_terug == 0.0:
-                    await self.huis.accu("zelfverbruik")
+                    await self._eigen(m)
                     b["accu"] = (f"Voedt het huis; terugverkopen voor {self._e(terug)} levert na laadverlies en slijtage minder op "
                                  f"dan later weer inkopen (vanaf {self._e(goedkoopst)})")
                 elif kw <= vraag_nu + 0.05:
-                    await self.huis.accu("zelfverbruik")
+                    await self._eigen(m)
                     b["accu"] = f"Voedt het huis ({self._k(vraag_nu)} kW); het huis gaat voor terugleveren"
                 else:
                     await self.huis.accu("ontladen", kw)
                     b["accu"] = f"Voedt het huis en levert {self._k(kw - vraag_nu)} kW terug (samen {self._k(kw)} kW)"
             elif k.accu_actie == "ontladen":
-                await self.huis.accu("zelfverbruik")
+                await self._eigen(m)
                 b["accu"] = "Voedt het huis"
             elif self._voeden(m, k, inkoop):
                 # Het huis vraagt nu stroom en die is duurder dan wat een opgeslagen kWh later oplevert: voeden.
-                await self.huis.accu("zelfverbruik")
+                await self._eigen(m)
                 b["accu"] = f"Voedt het huis op vraag: stroom nu {self._e(inkoop)}, een kWh in de accu is later {self._e(k.waarde_kwh)} waard"
             elif vraag > 0 or m.huis_kw + m.wp_kw + m.auto_kw > m.zon_kw:
                 await self.huis.accu("vasthouden", 0, m.accu_soc)
                 b["accu"] = (f"Houdt lading vast: later {self._e(k.waarde_kwh)} per kWh waard, nu {self._e(inkoop)}" if self.huis.kan_vasthouden
                              else "Voedt het huis (lading vasthouden kan bij dit merk nog niet veilig)")
             else:
-                await self.huis.accu("zelfverbruik")
+                await self._eigen(m)
                 b["accu"] = "Zelfverbruik"
+        if self._p1_tekst and "accu" in b:
+            b["accu"] += f" · {self._p1_tekst}"
         if "accu" in b and not self.huis.kan_accu_sturen:
             b["accu"] = "Advies: " + b["accu"][0].lower() + b["accu"][1:] + " (dit merk wordt nog alleen uitgelezen)"
         # --- zonnepanelen: aftoppen als terugleveren geld kost ---
