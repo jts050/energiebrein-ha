@@ -10,6 +10,8 @@ BASIS = Path(__file__).resolve().parent.parent
 # zodat alles een update of herstart overleeft.
 DATA = Path(os.environ.get("ENERGIEBREIN_DATA") or (BASIS / "data"))
 VOORBEELD = BASIS / "config.example.yaml"
+if not VOORBEELD.exists():  # in de Home Assistant-add-on heet het voorbeeld anders, anders leest Home Assistant het als add-on-instelling
+    VOORBEELD = BASIS / "voorbeeld-instellingen.yaml"
 
 
 def data_map(cfg: dict) -> Path:

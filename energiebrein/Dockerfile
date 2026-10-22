@@ -1,5 +1,6 @@
-ARG BUILD_FROM
-FROM ${BUILD_FROM}
+# Vaste basis (Debian met Python). Home Assistant gebruikt build.yaml niet altijd meer,
+# en dan zou het een Alpine-basis zonder apt-get pakken.
+FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -8,13 +9,8 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 COPY app/requirements.txt app/requirements-auto.txt /app/
-# gcc alleen tijdens het bouwen, voor het geval een onderdeel geen kant-en-klaar pakket heeft
-RUN apt-get update \
- && apt-get install -y --no-install-recommends gcc libc6-dev \
- && pip install --prefer-binary -r /app/requirements.txt \
- && (pip install --prefer-binary -r /app/requirements-auto.txt || echo 'autokoppeling overgeslagen') \
- && apt-get purge -y gcc libc6-dev && apt-get autoremove -y \
- && rm -rf /var/lib/apt/lists/*
+RUN pip install --prefer-binary -r /app/requirements.txt \
+ && (pip install --prefer-binary -r /app/requirements-auto.txt || echo 'autokoppeling overgeslagen')
 
 COPY app/ /app/
 COPY run.sh /run.sh
