@@ -85,7 +85,8 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
 
     @app.get("/")
     async def index():
-        return FileResponse(STATIC / "index.html")
+        # niet bewaren in de browser, anders zie je na een update nog de oude app
+        return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
     @app.get("/manifest.json")
     async def manifest():
