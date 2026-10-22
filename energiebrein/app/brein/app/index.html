@@ -125,7 +125,7 @@ main{min-width:0;padding:max(22px,env(safe-area-inset-top)) max(28px,env(safe-ar
 .opb .groot{font-size:38px;font-weight:800;letter-spacing:-.03em;line-height:1.05;color:var(--good)}
 .opb .staafjes{display:flex;align-items:flex-end;gap:4px;height:70px;margin:14px 0 4px}
 .opb .staafjes i{flex:1;border-radius:4px 4px 2px 2px;background:color-mix(in srgb,var(--good) 55%,transparent);min-height:3px}
-.opb .staafjes i.nu{background:var(--good)}
+.opb .staafjes i.vd{background:var(--good)}
 .opb .staafjes i.min{background:var(--bad);opacity:.6}
 .opb .as{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
 .opb .regels{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column}
@@ -448,7 +448,8 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 .rijen li .goed{color:var(--good)}
 .opb .groot{font-size:30px;font-weight:700;letter-spacing:-.025em}
 .opb .staafjes{height:56px}
-.opb .staafjes i{background:color-mix(in srgb,var(--good) 35%,transparent);border-radius:2px}
+.opb .staafjes{justify-content:flex-end}
+.opb .staafjes i{flex:0 0 calc((100% - 13*4px)/14);background:color-mix(in srgb,var(--good) 35%,transparent);border-radius:2px}
 .opb .regels li{border-top:0;border-bottom:1px solid var(--hair);padding:12px 0;font-size:15px}
 .opb .regels li b{font-weight:600}
 .feiten{gap:0}
@@ -456,6 +457,116 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 .feiten b{font-size:15px;font-weight:600}
 .ai{grid-template-columns:1fr;gap:18px;margin-top:0}
 .nu-links .ai-blok{margin-top:34px}
+
+/* ================= Verfijning (1.4) =================
+   Eén opvallend ding: het levende energieschema. Alles eromheen blijft rustig, maar netter uitgelijnd. */
+[data-v]:not([hidden]){animation:binnen .18s ease-out}
+@keyframes binnen{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){[data-v]:not([hidden]){animation:none}}
+.menu button{position:relative}
+.menu button[aria-current=page]::before{content:"";position:absolute;left:-16px;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--accu)}
+.menu button[aria-current=page] svg{color:var(--accu);opacity:1}
+@media (max-width:820px){
+  .tabbar button{position:relative;isolation:isolate}
+  .tabbar button[aria-current=page]::before{content:"";position:absolute;z-index:-1;top:1px;left:50%;width:54px;height:30px;margin-left:-27px;border-radius:15px;background:color-mix(in srgb,var(--accu) 15%,transparent)}
+  .tabbar button[aria-current=page] svg{color:var(--accu)}
+}
+
+/* energieschema */
+.stroom{margin:20px 0 4px}
+.stroom svg{max-width:440px;overflow:visible}
+.stroom .lijn{fill:none;stroke:var(--line);stroke-width:1.5;opacity:1}
+.stroom .vloei{fill:none;stroke-width:3;stroke-linecap:round;stroke-dasharray:.01 11;animation:stroomdots var(--duur,1.6s) linear infinite;filter:none;opacity:.95}
+.stroom .vloei.terug{animation-direction:reverse}
+@keyframes stroomdots{to{stroke-dashoffset:-22.02}}
+@media (prefers-reduced-motion:reduce){.stroom .vloei{animation:none;stroke-dasharray:none;opacity:.55}}
+.stroom .kn .knoop{fill:var(--surface)}
+.stroom .kn .rand{fill:none;stroke:var(--k);stroke-width:1.5;transition:stroke .4s}
+.stroom .kn .ic{color:var(--k);transition:color .4s}
+.stroom .kn .waarde{font:600 15px var(--font);fill:var(--ink);letter-spacing:-.01em;transition:fill .4s}
+.stroom .kn .eenh{font:500 10px var(--font);fill:var(--muted)}
+.stroom .kn .naam{font:500 12.5px var(--font);fill:var(--ink)}
+.stroom .kn .sub{font:400 11.5px var(--font);fill:var(--muted)}
+.stroom .kn.uit .rand{stroke:var(--line)}
+.stroom .kn.uit .ic{color:var(--faint)}
+.stroom .kn.uit .waarde{fill:var(--muted)}
+.stroom .kn.uit .naam{fill:var(--muted)}
+.stroom .ring-bg{fill:none;stroke:var(--line);stroke-width:3}
+.stroom .ring{fill:none;stroke:var(--accu);stroke-width:3;stroke-linecap:round;transition:stroke-dasharray .8s}
+.stroom .huisg .huis{fill:var(--ink)}
+.stroom .huisg .ic{color:var(--bg)}
+.stroom .huisg .huiswaarde{font:700 13px var(--font);fill:var(--bg)}
+.stroom .huisg .naam{font:500 12.5px var(--font);fill:var(--muted)}
+
+/* prijs en zin van het brein */
+.niveau{font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:99px;letter-spacing:0;background:var(--raised);color:var(--muted)}
+.niveau.goedkoop{background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)}
+.niveau.duur{background:color-mix(in srgb,var(--zon) 16%,transparent);color:var(--zon)}
+.nu-prijs{align-items:center}
+.brein{margin-top:14px;align-items:flex-start;gap:12px}
+.brein .ico{width:34px;height:34px;border-radius:11px;margin-top:1px}
+.brein .ico svg{width:19px;height:19px}
+.brein .zin{margin:0;font-size:clamp(16px,2vw,18px);font-weight:500;letter-spacing:-.012em;line-height:1.4}
+.brein .zin2{margin:5px 0 0}
+.spark-sectie{margin-top:34px;max-width:620px}
+.spark svg{margin-top:2px;overflow:visible}
+.spark .sv{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:10px;font-size:13px;color:var(--muted)}
+.spark .sv i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:0}
+
+/* apparaten als twee regels met het getal rechts */
+.rijen li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:0 14px;align-items:center;padding:12px 0}
+.rijen li>i{width:8px;height:8px;border-radius:50%;margin:0}
+.rijen .rn{min-width:0}
+.rijen .rn b{display:block;font-weight:500;font-size:15px;color:var(--ink)}
+.rijen .rn small{display:block;font-size:13px;color:var(--muted);margin-top:1px}
+.rijen .fig{font-size:17px;font-weight:600;letter-spacing:-.01em;color:var(--ink);text-align:right;white-space:nowrap}
+.rijen li span:last-child{color:var(--ink)}
+.rijen li[data-naar]:hover .rn b{color:var(--muted)}
+
+/* plan */
+.grafiek{margin:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.grafiek svg{width:auto;min-width:0;max-width:none;height:auto}
+.grafiek text{font:500 11px var(--font);fill:var(--muted)}
+.grafiek .halo{paint-order:stroke;stroke:var(--bg);stroke-width:3px;stroke-linejoin:round}
+.grafiek .dagnaam{font-weight:700;fill:var(--ink)}
+.grafiek .nutekst{font-weight:700;fill:var(--ink)}
+.grafiek .socwaarde{font-weight:700;fill:var(--ink)}
+.legenda{gap:6px 18px}
+.uitleg{background:var(--surface);border-radius:12px;padding:12px 14px}
+.uitleg b{display:block;font-weight:600}
+.uitleg span{display:block;color:var(--muted);font-size:14px;margin-top:2px}
+.acties li{grid-template-columns:150px 12px minmax(0,1fr)}
+.acties .t small{display:block;font-weight:400;color:var(--muted);font-size:13px;margin-top:1px}
+@media (max-width:600px){
+  .acties li{grid-template-columns:12px minmax(0,1fr);grid-template-areas:"d t" "d w";gap:3px 12px}
+  .acties .t{grid-area:t;font-size:13px;font-weight:500;color:var(--muted)}
+  .acties .t small{display:inline;margin-left:6px}
+  .acties .d{grid-area:d;margin-top:6px}
+  .acties .w{grid-area:w}
+}
+
+/* bediening: elke kaart krijgt de kleur van zijn apparaat */
+.app-kaart .keuze button[aria-pressed=true]{background:color-mix(in srgb,var(--k,var(--ink)) 16%,var(--raised));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--k,var(--ink)) 55%,transparent)}
+.app-kaart .keuze{background:none}
+
+/* logboek */
+.logboek li{align-items:start}
+.logboek .s{align-self:start;margin-top:7px}
+@media (max-width:820px){
+  .lbfilter{flex-wrap:nowrap;overflow-x:auto;margin-left:-16px;margin-right:-16px;padding:0 16px 2px;scrollbar-width:none}
+  .lbfilter::-webkit-scrollbar{display:none}
+  .lbfilter button,.lbfilter select{flex:none;white-space:nowrap}
+  .lbfilter select{margin-left:0}
+}
+
+/* koppelen op telefoon */
+@media (max-width:560px){
+  .onderdeel>summary .stand{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .modus .schakel span{display:none}
+  .storing{grid-template-columns:auto minmax(0,1fr);gap:8px 12px;padding:12px 14px}
+  .storing .btn{grid-column:2;justify-self:start}
+  .storing p{font-size:13.5px}
+}
 </style>
 </head>
 <body>
@@ -496,12 +607,12 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
           <div class="nu-prijs" id="prijs"><span class="groot">–</span></div>
           <div class="nu-sub" id="prijssub"></div>
           <div class="stroom" id="stroom" aria-label="Stroom in je huis op dit moment"></div>
-          <p class="zin" id="wat">Het brein start op</p>
-          <p class="zin2" id="waarom"></p>
+          <div class="brein"><span class="ico" aria-hidden="true"><svg><use href="#i-brein"/></svg></span>
+            <div><p class="zin" id="wat">Het brein start op</p><p class="zin2" id="waarom"></p></div></div>
           <p class="zin2" id="kop" hidden></p>
+          <div class="sectie spark-sectie"><h2>Prijs komende 24 uur</h2><div class="spark" id="spark"></div></div>
         </div>
         <div class="nu-rechts">
-          <div class="sectie"><h2>Prijs vandaag</h2><div class="spark" id="spark"></div></div>
           <div class="sectie"><h2>Apparaten</h2><ul class="rijen" id="rijen"></ul></div>
           <div class="sectie"><h2>Vandaag</h2><div class="cijfers" id="vandaag"></div></div>
           <div class="sectie opb"><h2>Wat het je oplevert</h2><div id="opbrengst"><p class="klein">Na een dag meten zie je hier wat zon, accu en het brein je opleveren.</p></div></div>
@@ -531,7 +642,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
       <div class="blok">
         <div class="grafiek" id="grafiek"></div>
         <div class="legenda"><span><i style="background:var(--accu)"></i>Accu laadt</span><span><i style="background:var(--zon)"></i>Accu levert</span><span><i style="background:var(--line)"></i>Accu wacht</span><span><i style="background:var(--ink);height:3px;border-radius:2px"></i>Lading accu</span><span><i style="background:var(--auto)"></i>Auto laadt</span><span><i style="background:var(--wp)"></i>Warmtepomp stookt extra</span></div>
-        <div class="uitleg" id="uitleg">Tik op een kwartier voor de uitleg.</div>
+        <div class="uitleg" id="uitleg" aria-live="polite">Tik op een kwartier voor de uitleg.</div>
       </div>
       <div class="tweekol">
         <div class="blok"><h2>Wat er gaat gebeuren</h2><ul class="acties" id="acties"></ul></div>
@@ -544,11 +655,11 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
     <section id="v-bediening" data-v hidden>
       <div class="kop1"><div><h1>Bediening</h1><p>Op Slim beslist het brein. Kies iets anders om zelf in te grijpen.</p></div></div>
       <div class="apparaten">
-        <div class="app-kaart">
+        <div class="app-kaart" style="--k:var(--accu)">
           <div class="app-kop"><div class="ico" style="background:color-mix(in srgb,var(--accu) 16%,transparent);color:var(--accu)"><svg><use href="#i-accu"/></svg></div><div><b>Thuisaccu</b><span id="s-accu"></span></div></div>
           <div class="keuze" data-a="accu"><button data-s="auto">Slim</button><button data-s="laden">Laden</button><button data-s="ontladen">Leveren</button><button data-s="vasthouden">Vasthouden</button></div>
         </div>
-        <div class="app-kaart breed">
+        <div class="app-kaart breed" style="--k:var(--auto)">
           <div class="app-kop"><div class="ico" style="background:color-mix(in srgb,var(--auto) 16%,transparent);color:var(--auto)"><svg><use href="#i-auto"/></svg></div><div><b>Auto laden</b><span id="s-lp"></span></div></div>
           <div class="keuze" data-a="laadpaal"><button data-s="auto">Slim</button><button data-s="zon">Alleen zon</button><button data-s="nu">Nu vol</button><button data-s="stop">Stop</button></div>
           <div class="autosam" id="autosam"></div>
@@ -571,13 +682,13 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
           </form>
           <div class="ap-eenmalig" id="ap-eenmalig" hidden></div>
         </div>
-        <div class="app-kaart">
+        <div class="app-kaart" style="--k:var(--wp)">
           <div class="app-kop"><div class="ico" style="background:color-mix(in srgb,var(--wp) 16%,transparent);color:var(--wp)"><svg><use href="#i-wp"/></svg></div><div><b>Warmtepomp</b><span id="s-wp"></span></div></div>
           <div class="keuze" data-a="warmtepomp"><button data-s="auto">Slim</button><button data-s="boost">Extra</button><button data-s="normaal">Normaal</button><button data-s="wacht">Wachten</button></div>
         </div>
-        <div class="app-kaart">
+        <div class="app-kaart" style="--k:var(--zon)">
           <div class="app-kop"><div class="ico" style="background:color-mix(in srgb,var(--zon) 16%,transparent);color:var(--zon)"><svg><use href="#i-zon"/></svg></div><div><b>Zonnepanelen</b><span id="s-zon"></span></div></div>
-          <div class="keuze" data-a="zon"><button data-s="auto">Aftoppen bij negatieve prijs</button><button data-s="altijd">Altijd aan</button></div>
+          <div class="keuze" data-a="zon"><button data-s="auto">Slim aftoppen</button><button data-s="altijd">Altijd aan</button></div>
         </div>
       </div>
       <div class="blok" style="margin-top:18px"><h2>Aangesloten</h2><div class="cijfers" id="apps"></div></div>
@@ -855,34 +966,54 @@ function view(v){if(!VIEWS.includes(v))v='thuis';
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>view(b.dataset.view));
 
 /* ---------- energieschema ---------- */
-const KNOPEN={zon:{x:62,y:52,kleur:'var(--zon)',naam:'Zon'},net:{x:298,y:52,kleur:'var(--net)',naam:'Net'},
-  accu:{x:180,y:246,kleur:'var(--accu)',naam:'Accu'},auto:{x:62,y:246,kleur:'var(--auto)',naam:'Auto'},
-  wp:{x:298,y:246,kleur:'var(--wp)',naam:'Warmtepomp'}};
-const HUIS={x:180,y:146};
+const KNOPEN={zon:{x:62,y:72,kleur:'var(--zon)',naam:'Zon',icoon:'i-zon'},net:{x:298,y:72,kleur:'var(--net)',naam:'Net',icoon:'i-net'},
+  accu:{x:180,y:272,kleur:'var(--accu)',naam:'Accu',icoon:'i-accu'},auto:{x:62,y:272,kleur:'var(--auto)',naam:'Auto',icoon:'i-auto'},
+  wp:{x:298,y:272,kleur:'var(--wp)',naam:'Warmtepomp',icoon:'i-wp'}};
+const HUIS={x:180,y:172}, KR=30, RING=2*Math.PI*(KR+5);
 function lijn(k){const a=KNOPEN[k];if(k==='accu')return `M${a.x} ${a.y} L${HUIS.x} ${HUIS.y}`;
   return `M${a.x} ${a.y} C ${a.x} ${HUIS.y}, ${(a.x+HUIS.x)/2} ${HUIS.y}, ${HUIS.x} ${HUIS.y}`;}
+/* Het schema wordt één keer getekend en daarna alleen bijgewerkt: de stroompjes lopen dan door zonder te haperen. */
+let STROOM_SIG='';
+function stroomSkelet(zicht){
+  let lijnen='',knopen='';
+  for(const k in KNOPEN){if(!zicht[k])continue;const n=KNOPEN[k],boven=n.y<HUIS.y;
+    lijnen+=`<path class="lijn" d="${lijn(k)}"/><path class="vloei" data-k="${k}" d="${lijn(k)}" style="stroke:${n.kleur};display:none"/>`;
+    const ly=boven?[n.y-53,n.y-38]:[n.y+KR+20,n.y+KR+35];
+    knopen+=`<g class="kn uit" data-k="${k}" style="--k:${n.kleur}">
+      ${k==='accu'?`<circle class="ring-bg" cx="${n.x}" cy="${n.y}" r="${KR+5}"/><circle class="ring" cx="${n.x}" cy="${n.y}" r="${KR+5}" transform="rotate(-90 ${n.x} ${n.y})" stroke-dasharray="0 ${RING.toFixed(1)}"/>`:''}
+      <circle class="knoop" cx="${n.x}" cy="${n.y}" r="${KR}"/><circle class="rand" cx="${n.x}" cy="${n.y}" r="${KR}"/>
+      <use class="ic" href="#${n.icoon}" x="${n.x-8}" y="${n.y-21}" width="16" height="16"/>
+      <text class="waarde" x="${n.x}" y="${n.y+15}" text-anchor="middle"><tspan class="getal">0</tspan><tspan class="eenh" dx="2">${k==='accu'?'%':'kW'}</tspan></text>
+      <text class="naam" x="${n.x}" y="${ly[0]}" text-anchor="middle">${n.naam}</text>
+      <text class="sub" x="${n.x}" y="${ly[1]}" text-anchor="middle"></text></g>`;}
+  const huis=`<g class="huisg"><circle class="huis" cx="${HUIS.x}" cy="${HUIS.y}" r="27"/>
+    <use class="ic" href="#i-huis" x="${HUIS.x-8}" y="${HUIS.y-20}" width="16" height="16"/>
+    <text class="huiswaarde" x="${HUIS.x}" y="${HUIS.y+15}" text-anchor="middle">0</text>
+    <text class="naam" x="${HUIS.x}" y="${HUIS.y-37}" text-anchor="middle">Huis</text></g>`;
+  return `<svg viewBox="0 0 360 346" role="img">${lijnen}${huis}${knopen}</svg>`;
+}
 function renderStroom(m,a){
   // richting: + = naar het huis toe
   const st={zon:m.zon_kw, net:m.net_kw, accu:-m.accu_kw, auto:-m.auto_kw, wp:-m.wp_kw};
   const zicht={zon:true,net:true,accu:true,auto:!!a.laadpaal,wp:!!a.warmtepomp};
+  const el=$('stroom'),sig=Object.keys(zicht).filter(k=>zicht[k]).join();
+  if(sig!==STROOM_SIG){STROOM_SIG=sig;el.innerHTML=stroomSkelet(zicht);}
   const soc=Math.max(0,Math.min(100,m.accu_soc));
-  let g='';
-  for(const k in KNOPEN){if(!zicht[k])continue;const n=KNOPEN[k],p=st[k],kw=Math.abs(p);
-    g+=`<path class="lijn" d="${lijn(k)}"/>`;
-    if(kw>=0.05){const duur=Math.max(0.6,2.6-kw*0.35);
-      g+=`<path class="vloei${p<0?' terug':''}" d="${lijn(k)}" stroke="${n.kleur}" style="--duur:${duur}s"/>`;}}
-  for(const k in KNOPEN){if(!zicht[k])continue;const n=KNOPEN[k],p=st[k],kw=Math.abs(p),actief=kw>=0.05;
-    const binnen=k==='accu'?nf(soc,0)+'%':nf(kw);
-    const sub={zon:'Zon kW',net:p>=0.05?'Van net kW':p<=-0.05?'Naar net kW':'Net kW',
-      accu:p>0.05?`levert ${nf(kw)} kW`:p<-0.05?`laadt ${nf(kw)} kW`:'Accu',
-      auto:m.auto_verbonden?'Auto kW':'Geen auto',wp:'Warmtepomp kW'}[k];
-    g+=`<g class="${actief||k==='accu'?'':'uit'}"><circle class="knoop" cx="${n.x}" cy="${n.y}" r="28"/>
-      <circle class="rand" cx="${n.x}" cy="${n.y}" r="28" stroke="${actief||k==='accu'?n.kleur:'var(--line)'}"/>
-      <text class="waarde" x="${n.x}" y="${n.y+5}" text-anchor="middle" style="fill:${actief||k==='accu'?n.kleur:'var(--muted)'}">${binnen}</text>
-      <text class="naam" x="${n.x}" y="${n.y+(n.y<HUIS.y?-38:46)}" text-anchor="middle">${sub}</text></g>`;}
-  g+=`<circle class="huis" cx="${HUIS.x}" cy="${HUIS.y}" r="21"/><text class="huiswaarde" x="${HUIS.x}" y="${HUIS.y+5}" text-anchor="middle">${nf(m.huis_kw)}</text>
-    <text class="naam" x="${HUIS.x}" y="${HUIS.y-30}" text-anchor="middle">Huis kW</text>`;
-  $('stroom').innerHTML=`<svg viewBox="0 0 360 300" role="img" aria-label="Zon ${nf(m.zon_kw)} kW, net ${nf(m.net_kw)} kW, huis ${nf(m.huis_kw)} kW, accu ${nf(soc,0)} procent">${g}</svg>`;
+  for(const k in KNOPEN){if(!zicht[k])continue;const p=st[k],kw=Math.abs(p),actief=kw>=0.05;
+    const g=el.querySelector(`.kn[data-k="${k}"]`),v=el.querySelector(`.vloei[data-k="${k}"]`);if(!g||!v)continue;
+    g.classList.toggle('uit',!actief&&k!=='accu');
+    v.style.display=actief?'':'none';v.classList.toggle('terug',p<0);
+    v.style.setProperty('--duur',Math.max(0.7,3-kw*0.4).toFixed(2)+'s');v.style.strokeWidth=(2.2+Math.min(kw,6)*0.35).toFixed(2);
+    g.querySelector('.getal').textContent=k==='accu'?nf(soc,0):nf(kw);
+    const sub={zon:actief?'produceert':'geen opbrengst',
+      net:p>=0.05?'van het net':p<=-0.05?'naar het net':'geen uitwisseling',
+      accu:p>0.05?`levert ${nf(kw)} kW`:p<-0.05?`laadt ${nf(kw)} kW`:'wacht',
+      auto:m.auto_verbonden?(actief?'laadt':'aangesloten'):'geen auto',
+      wp:actief?'stookt':'rust'}[k];
+    g.querySelector('.sub').textContent=sub;
+    if(k==='accu')g.querySelector('.ring').setAttribute('stroke-dasharray',`${(soc/100*RING).toFixed(1)} ${RING.toFixed(1)}`);}
+  el.querySelector('.huiswaarde').textContent=nf(m.huis_kw);
+  el.querySelector('svg').setAttribute('aria-label',`Zon ${nf(m.zon_kw)} kW, net ${nf(m.net_kw)} kW, huis ${nf(m.huis_kw)} kW, accu ${nf(soc,0)} procent`);
 }
 
 /* ---------- status ---------- */
@@ -916,12 +1047,12 @@ function renderStatus(){
   $('vandaag').innerHTML=`<div class="cijfer"><b>${eur(t.kosten)}</b><span>Stroomkosten</span></div><div class="cijfer goed"><b>${eur(t.kosten_zonder_accu-t.kosten)}</b><span>Bespaard door de accu</span></div><div class="cijfer"><b>${nf(t.zon_kwh)} kWh</b><span>Zon opgewekt</span></div><div class="cijfer"><b>${nf(t.afname_kwh)} kWh</b><span>Van het net</span></div>`;
   // apparaten
   const soc=Math.max(0,Math.min(100,m.accu_soc)),ak=m.accu_kw;
-  const r=[[`var(--accu)`,'Thuisaccu',`${nf(soc,0)}% · ${nf(S.accu_kwh*soc/100)} kWh${ak>0.05?` · laadt ${nf(ak)} kW`:ak<-0.05?` · levert ${nf(-ak)} kW`:''}`]];
-  r.push(['var(--zon)','Zonnepanelen',`${nf(m.zon_kw)} kW · vandaag ${nf(t.zon_kwh)} kWh`]);
-  if(a.laadpaal){const A=(S.auto||{}).auto||{};const soc2=A.soc!=null?`${nf(A.soc,0)}%`:'';
-    r.push(['var(--auto)','Auto',m.auto_verbonden?[soc2,m.auto_kw>0.05?`laadt ${nf(m.auto_kw)} kW`:'aangesloten'].filter(Boolean).join(' · '):(soc2?soc2+' · niet aangesloten':'Niet aangesloten')]);}
-  if(a.warmtepomp)r.push(['var(--wp)','Warmtepomp',`${esc((b.warmtepomp||'').split(/[.:]/)[0]||'Normaal')}${m.wp_kw>0.05?' · '+nf(m.wp_kw)+' kW':''}`]);
-  $('rijen').innerHTML=r.map(([c,n,w])=>`<li data-naar="bediening"><span><i style="background:${c}"></i>${n}</span><span>${w}</span></li>`).join('');
+  const r=[['var(--accu)','Thuisaccu',`${nf(S.accu_kwh*soc/100)} kWh${ak>0.05?` · laadt ${nf(ak)} kW`:ak<-0.05?` · levert ${nf(-ak)} kW`:' · wacht'}`,`${nf(soc,0)}%`],
+    ['var(--zon)','Zonnepanelen',`vandaag ${nf(t.zon_kwh)} kWh`,`${nf(m.zon_kw)} kW`]];
+  if(a.laadpaal){const A=(S.auto||{}).auto||{};const soc2=A.soc!=null?`${nf(A.soc,0)}%`:'–';
+    r.push(['var(--auto)','Auto',m.auto_verbonden?(m.auto_kw>0.05?`laadt ${nf(m.auto_kw)} kW`:'aangesloten'):'niet aangesloten',soc2]);}
+  if(a.warmtepomp)r.push(['var(--wp)','Warmtepomp',esc((b.warmtepomp||'').split(/[.:]/)[0]||'Normaal'),m.wp_kw>0.05?`${nf(m.wp_kw)} kW`:'rust']);
+  $('rijen').innerHTML=r.map(([c,nm,sub,fig])=>`<li data-naar="bediening"><i style="background:${c}"></i><span class="rn"><b>${nm}</b><small>${sub}</small></span><span class="fig">${fig}</span></li>`).join('');
   $('rijen').querySelectorAll('[data-naar]').forEach(li=>li.onclick=()=>view(li.dataset.naar));
   renderAI(v);
   // bediening
@@ -933,24 +1064,40 @@ function renderStatus(){
   renderAuto();
   const namen={omvormer:'Omvormer en accu',p1:'Slimme meter',laadpaal:'Laadpaal',warmtepomp:'Warmtepomp'};
   $('apps').innerHTML=Object.entries(namen).map(([k,n])=>{const f=Object.entries(S.fouten||{}).find(([x])=>x.startsWith(k)),mld=(S.meldingen||{})[k];
-    return `<div class="cijfer"><b style="font-size:17px">${a[k]?esc(a[k]):'Niet gekoppeld'}</b><span>${n}${f?`. <span class="fout">${esc(f[1])}</span>`:''}${mld&&!f?`. ${esc(mld)}`:''}</span></div>`;}).join('');
+    return `<div class="cijfer"><b>${a[k]?esc(a[k]):'Niet gekoppeld'}</b><span>${n}${f?`. <span class="fout">${esc(f[1])}</span>`:''}${mld&&!f?`. ${esc(mld)}`:''}</span></div>`;}).join('');
 }
+function prijsNiveau(nu){const K=((P&&P.kwartieren)||[]).slice(0,96).map(k=>k.inkoop);if(K.length<8)return '';
+  const s=[...K].sort((a,b)=>a-b),lo=s[Math.floor(s.length*.33)],hi=s[Math.floor(s.length*.67)];
+  const [c,t]=nu<=lo?['goedkoop','Goedkoop']:nu>=hi?['duur','Duur']:['','Gemiddeld'];
+  return `<span class="niveau ${c}">${t}</span>`;}
 function prijsTrend(nu){if(!P||!P.kwartieren||P.kwartieren.length<2)return '';
-  const K=P.kwartieren.slice(1,49);
+  const K=P.kwartieren.slice(1,49);let t='<span class="trend">blijft gelijk</span>';
   for(const k of K){const d=k.inkoop-nu;
-    if(Math.abs(d)>=0.03)return `<span class="trend ${d<0?'omlaag':'omhoog'}">${d<0?'▼ zakt':'▲ stijgt'} om ${tijd(k.start)}</span>`;}
-  return '<span class="trend">blijft gelijk</span>';}
+    if(Math.abs(d)>=0.03){t=`<span class="trend ${d<0?'omlaag':'omhoog'}">${d<0?'▼ zakt':'▲ stijgt'} om ${tijd(k.start)}</span>`;break;}}
+  return prijsNiveau(nu)+t;}
 function renderSpark(){const el=$('spark');if(!el||!P||!P.kwartieren.length)return;
-  const K=P.kwartieren.slice(0,96), W=420,H=70, mx=Math.max(...K.map(k=>k.inkoop)), mn=Math.min(...K.map(k=>k.inkoop));
-  const x=i=>i/(K.length-1)*W, y=v=>6+(mx-v)/((mx-mn)||1)*(H-12);
-  const pts=K.map((k,i)=>`${x(i).toFixed(1)},${y(k.inkoop).toFixed(1)}`).join(' ');
-  const gi=K.indexOf(K.reduce((a,b)=>b.inkoop<a.inkoop?b:a)), di=K.indexOf(K.reduce((a,b)=>b.inkoop>a.inkoop?b:a));
-  el.innerHTML=`<svg viewBox="0 0 ${W} ${H+34}" aria-label="Prijs komende 24 uur">
-    <polyline points="${pts}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linejoin="round"/>
-    <circle cx="${x(0)}" cy="${y(K[0].inkoop)}" r="4" fill="var(--ink)"/>
-    <circle cx="${x(gi)}" cy="${y(K[gi].inkoop)}" r="3" fill="var(--good)"/><circle cx="${x(di)}" cy="${y(K[di].inkoop)}" r="3" fill="var(--zon)"/>
-    <text x="0" y="${H+16}">nu</text><text x="${W}" y="${H+16}" text-anchor="end">over 24 uur</text>
-    <text x="0" y="${H+32}" style="fill:var(--muted)">Goedkoopst ${tijd(K[gi].start)} · ${eur(K[gi].inkoop)}</text><text x="${W}" y="${H+32}" text-anchor="end" style="fill:var(--muted)">duurst ${tijd(K[di].start)} · ${eur(K[di].inkoop)}</text></svg>`;}
+  const K=P.kwartieren.slice(0,96),n=K.length,W=440,H=92,PL=7,PR=7,T=8,B=14;
+  const pr=K.map(k=>k.inkoop),mx=Math.max(...pr),mn=Math.min(...pr),sorted=[...pr].sort((a,b)=>a-b);
+  const laag=sorted[Math.floor(n*.25)],hoog=sorted[Math.floor(n*.75)];
+  const x=i=>PL+i/Math.max(n-1,1)*(W-PL-PR), y=v=>T+(mx-v)/((mx-mn)||1)*(H-T-B-6);
+  const pts=K.map((k,i)=>`${x(i).toFixed(1)},${y(k.inkoop).toFixed(1)}`);
+  const vlak=`M${x(0).toFixed(1)},${H-B} L${pts.join(' L')} L${x(n-1).toFixed(1)},${H-B} Z`;
+  // lint onderaan: groen = goedkoopste kwart van de uren, geel = duurste kwart
+  let lint='';const rb=(i,j,c)=>`<rect x="${x(i).toFixed(1)}" y="${H-B+3}" width="${Math.max(x(j)-x(i),2).toFixed(1)}" height="4" rx="2" fill="${c}"/>`;
+  let s0=null,soort=null;
+  K.forEach((k,i)=>{const t=k.inkoop<=laag?'g':k.inkoop>=hoog?'y':null;
+    if(t!==soort){if(soort)lint+=rb(s0,i,soort==='g'?'var(--good)':'var(--zon)');soort=t;s0=i;}});
+  if(soort)lint+=rb(s0,n-1,soort==='g'?'var(--good)':'var(--zon)');
+  let as='';K.forEach((k,i)=>{const d=new Date(k.start);if(i>3&&d.getMinutes()===0&&d.getHours()%6===0)as+=`<line x1="${x(i)}" x2="${x(i)}" y1="${T}" y2="${H-B}" stroke="var(--hair)"/><text x="${x(i)}" y="${H+16}" text-anchor="middle">${d.getHours()}:00</text>`;});
+  const gi=pr.indexOf(mn),di=pr.indexOf(mx);
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H+22}" aria-label="Prijs komende 24 uur">
+    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--ink);stop-opacity:.13"/><stop offset="1" style="stop-color:var(--ink);stop-opacity:0"/></linearGradient></defs>
+    ${as}<path d="${vlak}" fill="url(#sg)"/><polyline points="${pts.join(' ')}" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    ${lint}
+    <circle cx="${x(gi)}" cy="${y(mn)}" r="3.5" fill="var(--good)"/><circle cx="${x(di)}" cy="${y(mx)}" r="3.5" fill="var(--zon)"/>
+    <circle cx="${x(0)}" cy="${y(pr[0])}" r="4.5" fill="var(--ink)" stroke="var(--bg)" stroke-width="2"/>
+    <text x="${PL}" y="${H+16}" style="fill:var(--ink);font-weight:600">nu</text></svg>
+    <div class="sv"><span><i style="background:var(--good)"></i>Goedkoopst ${tijd(K[gi].start)} · ${eur(mn)}</span><span><i style="background:var(--zon)"></i>Duurst ${tijd(K[di].start)} · ${eur(mx)}</span></div>`;}
 
 function renderAI(v){
   const a=v.ai_huis||{}, w=v.ai_warmtepomp, f=[];
@@ -970,50 +1117,70 @@ function renderAI(v){
 
 /* ---------- plan ---------- */
 const KLEUR={laden:'var(--accu)',ontladen:'var(--zon)',rust:'var(--line)'};
+let PLANGEO=null;
 function renderPlan(){
   const K=P.kwartieren;if(!K.length){$('grafiek').innerHTML='<p class="klein">Nog geen plan.</p>';return;}
-  const W=Math.max(760,K.length*6),H=290,L=46,R=46,T=18,B=54,cw=(W-L-R)/K.length;
+  if(focusIdx==null||focusIdx>=K.length)focusIdx=0;
+  const box=$('grafiek'),bw=box.clientWidth||Math.max(320,innerWidth-32),smal=bw<700;
+  const L=44,R=8,T=24,B=54,H=smal?250:290,W=smal?Math.max(bw,Math.round(L+R+K.length*4.4)):bw,cw=(W-L-R)/K.length;
   const pmax=Math.max(...K.map(k=>k.inkoop))*1.08,pmin=Math.min(0,...K.map(k=>k.inkoop));
   const y=v=>T+(pmax-v)/(pmax-pmin)*(H-T-B), ys=v=>T+(1-v/100)*(H-T-B);
-  let g='';const stap=pmax>0.5?0.1:0.05;
-  for(let v=0;v<=pmax;v+=stap)g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${v?'stroke-dasharray="2 5"':''}/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">€${nf(v,2)}</text>`;
-  K.forEach((k,i)=>{const x=L+i*cw,yt=y(Math.max(k.inkoop,0)),y0=y(0);
-    g+=`<rect x="${x+0.6}" y="${Math.min(yt,y0)}" width="${Math.max(cw-1.2,1)}" height="${Math.max(Math.abs(y0-yt),1)}" rx="1.5" fill="${KLEUR[k.accu_actie]}" opacity="${focusIdx===i?1:.9}"/>`;
-    if(k.auto_kwh>0.01)g+=`<rect x="${x+0.6}" y="${H-B+8}" width="${Math.max(cw-1.2,1)}" height="6" rx="2" fill="var(--auto)"/>`;
-    if(k.wp_stand==='boost')g+=`<rect x="${x+0.6}" y="${H-B+17}" width="${Math.max(cw-1.2,1)}" height="6" rx="2" fill="var(--wp)"/>`;
-    const d=new Date(k.start);if(d.getMinutes()===0&&d.getHours()%3===0)g+=`<text x="${x}" y="${H-8}" text-anchor="middle">${d.getHours()===0?dag(k.start).slice(0,2):d.getHours()+':00'}</text>`;});
+  let g='',labels='';const stap=pmax>0.5?0.1:0.05;
+  for(let v=0;v<=pmax;v+=stap){g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${v?'stroke-dasharray="2 5"':''}/>`;
+    labels+=`<text x="${L-8}" y="${y(v)+4}" text-anchor="end">€${nf(v,2)}</text>`;}
+  let dagen='',as='';
+  K.forEach((k,i)=>{const x=L+i*cw,yt=y(Math.max(k.inkoop,0)),y0=y(0),d=new Date(k.start);
+    g+=`<rect x="${x+0.5}" y="${Math.min(yt,y0)}" width="${Math.max(cw-1,1)}" height="${Math.max(Math.abs(y0-yt),1)}" rx="1.2" fill="${KLEUR[k.accu_actie]}" opacity=".92"/>`;
+    if(k.auto_kwh>0.01)g+=`<rect x="${x+0.5}" y="${H-B+8}" width="${Math.max(cw-1,1)}" height="6" rx="2" fill="var(--auto)"/>`;
+    if(k.wp_stand==='boost')g+=`<rect x="${x+0.5}" y="${H-B+17}" width="${Math.max(cw-1,1)}" height="6" rx="2" fill="var(--wp)"/>`;
+    if(d.getMinutes()===0){
+      if(d.getHours()===0&&i>0){dagen+=`<line x1="${x}" x2="${x}" y1="${T}" y2="${H-B+26}" stroke="var(--muted)" stroke-opacity=".5" stroke-dasharray="1 4"/>`;
+        as+=`<text class="dagnaam" x="${x+4}" y="${H-10}">${esc(dag(k.start).slice(0,2))}</text>`;}
+      else if(d.getHours()%3===0&&i>2)as+=`<text x="${x}" y="${H-10}" text-anchor="middle">${d.getHours()}:00</text>`;}});
   const soc0=S&&S.meting?S.meting.accu_soc:K[0].soc_na;
-  const pts=[`${L},${ys(soc0)}`].concat(K.map((k,i)=>`${L+(i+1)*cw},${ys(k.soc_na)}`));
-  g+=`<polyline points="${pts.join(' ')}" fill="none" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/>`;
-  g+=`<text x="${W-R+8}" y="${ys(100)+4}">100%</text><text x="${W-R+8}" y="${ys(0)+4}">0%</text>`;
-  if(focusIdx!=null&&K[focusIdx])g+=`<rect x="${L+focusIdx*cw}" y="${T}" width="${cw}" height="${H-T-B}" fill="none" stroke="var(--ink)" stroke-width="1.5" rx="2"/>`;
-  $('grafiek').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Plan per kwartier">${g}</svg>`;
-  const svg=$('grafiek').querySelector('svg');
-  const kies=e=>{const r=svg.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,i=Math.floor((x-L)/cw);if(i>=0&&i<K.length&&i!==focusIdx){focusIdx=i;uitleg();renderPlan();}};
+  const pts=[`${L},${ys(soc0).toFixed(1)}`].concat(K.map((k,i)=>`${(L+(i+1)*cw).toFixed(1)},${ys(k.soc_na).toFixed(1)}`));
+  const vlak=`M${L},${ys(0)} L${pts.join(' L')} L${(L+K.length*cw).toFixed(1)},${ys(0)} Z`;
+  const hi=K.reduce((a,b,i)=>b.soc_na>K[a].soc_na?i:a,0);
+  let soc=`<defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--ink);stop-opacity:.14"/><stop offset="1" style="stop-color:var(--ink);stop-opacity:0"/></linearGradient></defs>
+    <path d="${vlak}" fill="url(#pg)"/><polyline points="${pts.join(' ')}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${L}" cy="${ys(soc0)}" r="4" fill="var(--ink)" stroke="var(--bg)" stroke-width="2"/>
+    <text class="halo socwaarde" x="${L+8}" y="${ys(soc0)-8}">${nf(soc0,0)}%</text>`;
+  if(K[hi].soc_na>soc0+8)soc+=`<text class="halo socwaarde" x="${(L+(hi+1)*cw).toFixed(1)}" y="${ys(K[hi].soc_na)-8}" text-anchor="middle">${nf(K[hi].soc_na,0)}%</text>`;
+  const f=focusIdx;
+  const band=`<rect id="fband" x="${L+f*cw}" y="${T}" width="${Math.max(cw,2)}" height="${H-T-B}" fill="var(--ink)" fill-opacity=".1" stroke="var(--ink)" stroke-opacity=".7" stroke-width="1" rx="1.5" pointer-events="none"/>`;
+  as=`<text class="nutekst" x="${L}" y="${H-10}">nu</text>`+as;
+  box.innerHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Plan per kwartier">${g}${dagen}${soc}${labels}${as}${band}</svg>`;
+  PLANGEO={L,cw,W,n:K.length};
+  const svg=box.querySelector('svg');
+  const kies=e=>{const r=svg.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,i=Math.floor((x-L)/cw);if(i>=0&&i<K.length&&i!==focusIdx)zetFocus(i);};
   svg.addEventListener('pointermove',kies);svg.addEventListener('pointerdown',kies);
+  uitleg();
   // acties: aaneengesloten blokken
   const blokken=[];let cur=null;
   K.forEach(k=>{const t=k.accu_actie;if(cur&&cur.t===t){cur.eind=k.start;cur.n++;cur.e+=k.accu_kwh;cur.p+=k.inkoop;}else{cur={t,start:k.start,eind:k.start,n:1,e:k.accu_kwh,p:k.inkoop,reden:k.reden};blokken.push(cur);}});
   const tekst={laden:'Accu laadt',ontladen:'Accu levert stroom',rust:'Accu wacht'};
+  const duur=n=>{const u=n/4;return u<1?`${n*15} min`:`${nf(u,u%1?1:0)} uur`;};
   $('acties').innerHTML=blokken.filter(b=>b.t!=='rust'||b.n>=8).slice(0,8).map(b=>{const eind=new Date(new Date(b.eind).getTime()+9e5).toISOString();
-    return `<li><span class="t">${tijd(b.start)}–${tijd(eind)}</span><span class="d" style="background:${KLEUR[b.t]}"></span><span class="w"><b>${tekst[b.t]}${b.t!=='rust'?' '+nf(Math.abs(b.e))+' kWh':''}</b><span>${esc(b.reden.split('. ')[0].replace(/\.$/,''))}. Gemiddeld ${eur(b.p/b.n)} per kWh.</span></span></li>`;}).join('');
+    return `<li><span class="t">${tijd(b.start)}–${tijd(eind)}<small>${duur(b.n)}</small></span><span class="d" style="background:${KLEUR[b.t]}"></span><span class="w"><b>${tekst[b.t]}${b.t!=='rust'?' '+nf(Math.abs(b.e))+' kWh':''}</b><span>${esc(b.reden.split('. ')[0].replace(/\.$/,''))}. Gemiddeld ${eur(b.p/b.n)} per kWh.</span></span></li>`;}).join('');
   const s=P.samenvatting||{};
   if(s.kwartieren)$('verwachting').innerHTML=`<div class="cijfer"><b>${eur(s.kosten_plan)}</b><span>Stroomkosten tot ${dag(s.tot)} ${tijd(s.tot)}</span></div><div class="cijfer goed"><b>${eur(s.besparing)}</b><span>Minder dan zonder accu</span></div><div class="cijfer"><b>${tijd(s.goedkoopste)}</b><span>Goedkoopste moment</span></div><div class="cijfer"><b>${tijd(s.duurste)}</b><span>Duurste moment</span></div>`;
 }
-function uitleg(){const k=P.kwartieren[focusIdx];if(!k)return;
-  $('uitleg').innerHTML=`<b>${dag(k.start)} ${tijd(k.start)}</b>, ${eur(k.inkoop)} per kWh, accu naar ${nf(k.soc_na,0)}%. ${esc(k.reden)}`;}
+/* een ander kwartier kiezen verplaatst alleen het kader, de grafiek wordt niet opnieuw getekend */
+function zetFocus(i){focusIdx=i;const b=$('fband');if(b&&PLANGEO){b.setAttribute('x',PLANGEO.L+i*PLANGEO.cw);b.setAttribute('width',Math.max(PLANGEO.cw,2));}uitleg();}
+function uitleg(){const k=P&&P.kwartieren[focusIdx];if(!k)return;
+  $('uitleg').innerHTML=`<b>${focusIdx===0?'Nu':dag(k.start).slice(0,2)+' '+tijd(k.start)} · ${eur(k.inkoop)} per kWh · accu naar ${nf(k.soc_na,0)}%</b><span>${esc(k.reden)}</span>`;}
 
 async function laadOpbrengst(){try{const o=await api('/api/opbrengst?dagen=30');const el=$('opbrengst');
-  if(!o.dagen.length)return;
+  if(!o.dagen.length||o.dagen.every(d=>Math.abs(d.besparing)<0.005))return;
   const laatste=o.dagen.slice(-14),mx=Math.max(...laatste.map(d=>Math.abs(d.besparing)),0.01),vandaag=new Date().toISOString().slice(0,10);
   const maandnaam=new Date().toLocaleDateString('nl-NL',{month:'long'});
   el.innerHTML=`<div class="groot">${eur(o.maand.besparing)}</div><span class="klein">bespaard in ${maandnaam}, vergeleken met alle stroom van het net halen</span>
-    <div class="staafjes" role="img" aria-label="Besparing per dag, laatste ${laatste.length} dagen">${laatste.map(d=>`<i class="${d.besparing<0?'min':''}${d.dag===vandaag?' nu':''}" style="height:${Math.max(Math.abs(d.besparing)/mx*100,4)}%" title="${new Date(d.dag).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'})}: ${eur(d.besparing)}"></i>`).join('')}</div>
+    <div class="staafjes" role="img" aria-label="Besparing per dag, laatste ${laatste.length} dagen">${laatste.map(d=>`<i class="${d.besparing<0?'min':''}${d.dag===vandaag?' vd':''}" style="height:${Math.max(Math.abs(d.besparing)/mx*100,4)}%" title="${new Date(d.dag).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'})}: ${eur(d.besparing)}"></i>`).join('')}</div>
     <div class="as"><span>${new Date(laatste[0].dag).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}</span><span>vandaag</span></div>
     <ul class="regels"><li><span>Door de accu en het brein</span><b>${eur(o.maand.door_accu)}</b></li><li><span>Terugleveren leverde op</span><b>${eur(o.maand.teruglevering)}</b></li>
     ${o.volle_dagen>=3?`<li><span>Verwacht per jaar</span><b>± ${eur(o.per_jaar).replace(',00','')}</b></li>`:''}</ul>`;}catch(e){}}
 async function laadStatus(){try{S=await api('/api/status');renderStatus();$('err').hidden=true;}catch(e){$('err').textContent='Geen verbinding met het brein. Draait het programma nog? ('+e.message+')';$('err').hidden=false;}}
-async function laadPlan(){try{P=await api('/api/plan');if(S&&S.besluit&&S.besluit.inkoop!=null&&$('prijs'))$('prijs').innerHTML=`<span class="groot">${eur(S.besluit.inkoop)}</span>${prijsTrend(S.besluit.inkoop)}`;if(!$('v-plan').hidden)renderPlan();renderSpark();if(focusIdx!=null)uitleg();}catch(e){}}
+async function laadPlan(){try{P=await api('/api/plan');if(S&&S.besluit&&S.besluit.inkoop!=null&&$('prijs'))$('prijs').innerHTML=`<span class="groot">${eur(S.besluit.inkoop)}</span>${prijsTrend(S.besluit.inkoop)}`;if(!$('v-plan').hidden)renderPlan();renderSpark();}catch(e){}}
 
 document.querySelectorAll('.keuze[data-a]').forEach(g=>g.addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b||b.disabled)return;
@@ -1439,7 +1606,7 @@ function tekenGemeten(){
     <div class="cijfer"><b>${eur(kosten)}</b><span>Stroomkosten</span></div>
     <div class="cijfer goed"><b>${eur(zonder-kosten)}</b><span>Bespaard door de accu</span></div>`;
 }
-window.addEventListener('resize',()=>{if(!$('gemeten').hidden)tekenGemeten();});
+let RSZ=null;window.addEventListener('resize',()=>{clearTimeout(RSZ);RSZ=setTimeout(()=>{if(!$('gemeten').hidden)tekenGemeten();if(P&&!$('v-plan').hidden&&!$('planblok').hidden)renderPlan();},150);});
 setInterval(()=>{if(!$('gemeten').hidden&&!$('v-plan').hidden&&GM.dagen===0)laadGemeten();},60000);
 
 /* ---------- logboek ---------- */
