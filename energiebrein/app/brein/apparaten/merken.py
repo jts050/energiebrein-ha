@@ -835,6 +835,8 @@ class Easee:
         self._cache = (None, None)
         self._laatste_a = None
         self._laatste_a_tijd = None
+        self._route = "lader"
+        self._site_id = None
 
     @classmethod
     def voor_test(cls, ip, extra):
@@ -914,14 +916,40 @@ class Easee:
         nu = datetime.now(timezone.utc)
         tijd, d = self._cache
         if not d or (nu - tijd).total_seconds() >= 30:
-            try:
-                d = await self._vraag("GET", f"/chargers/{self.lader_id}/state")
-            except Easee403:
-                d = await self._vraag("GET", f"/state/{self.lader_id}")  # oudere route, die pyeasee ook gebruikt
+            d = await self._status()
             self._cache = (nu, d)
         modus = int(d.get("chargerOpMode") or 0)
         return {"auto_kw": float(d.get("totalPower") or 0), "auto_verbonden": modus in self.VERBONDEN,
                 "auto_geladen_kwh": float(d.get("sessionEnergy") or 0)}
+
+    async def _status(self) -> dict:
+        """Easee blokkeert de losse statusroute steeds vaker (403). De status van de locatie werkt wel; die gebruikt
+        de Home Assistant-koppeling (pyeasee) ook. We onthouden welke route werkt."""
+        if self._route == "lader":
+            try:
+                return await self._vraag("GET", f"/chargers/{self.lader_id}/state")
+            except Easee403:
+                self._route = "locatie"
+        if self._site_id is None:
+            for site in await self._vraag("GET", "/sites") or []:
+                st = await self._vraag("GET", f"/sites/{site['id']}/state")
+                if self._uit_locatie(st) is not None:
+                    self._site_id = site["id"]
+                    break
+            else:
+                raise RuntimeError(f"Easee: lader {self.lader_id} staat op geen enkele locatie van dit account.")
+        d = self._uit_locatie(await self._vraag("GET", f"/sites/{self._site_id}/state"))
+        if d is None:
+            self._site_id = None
+            raise RuntimeError(f"Easee: lader {self.lader_id} niet gevonden in de status van de locatie.")
+        return d
+
+    def _uit_locatie(self, st: dict) -> dict | None:
+        for kring in (st or {}).get("circuitStates") or []:
+            for lader in kring.get("chargerStates") or []:
+                if str(lader.get("chargerID", "")).upper() == self.lader_id:
+                    return lader.get("chargerState") or {}
+        return None
 
     async def laadstroom(self, ampere):
         a = int(max(0, min(32, round(ampere))))
@@ -931,6 +959,9 @@ class Easee:
         # niet vaker dan eens per minuut wijzigen, behalve naar 0 (stoppen moet direct kunnen)
         if a != 0 and self._laatste_a_tijd and (nu - self._laatste_a_tijd).total_seconds() < 60:
             return
-        await self._vraag("POST", f"/chargers/{self.lader_id}/settings", json={"dynamicChargerCurrent": a})
+        try:  # de opdracht die de Easee-app zelf ook gebruikt
+            await self._vraag("POST", f"/chargers/{self.lader_id}/commands/set_dynamic_charger_current", json={"amps": a, "minutes": 0})
+        except (Easee403, aiohttp.ClientResponseError):
+            await self._vraag("POST", f"/chargers/{self.lader_id}/settings", json={"dynamicChargerCurrent": a})
         self._laatste_a, self._laatste_a_tijd = a, nu
         log.info("Easee: laadstroom %s A", a)
