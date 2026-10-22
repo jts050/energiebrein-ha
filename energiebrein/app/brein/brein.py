@@ -222,7 +222,16 @@ class Brein:
             await self.huis.accu("vasthouden", 0, m.accu_soc)
             b["accu"] = ("Houdt lading vast: de auto laadt nu uit het net, niet uit de accu" if self.huis.kan_vasthouden
                          else "Voedt het huis (vasthouden kan bij dit merk nog niet, dus de accu helpt de auto mee)")
+        elif m.accu_soc >= float(self.cfg["accu"].get("max_soc", 100)) and self.huis.kan_vasthouden \
+                and m.zon_kw - (m.huis_kw + m.wp_kw + m.auto_kw) > (0.0 if getattr(self, "_vol_vast", False) else 0.1) \
+                and not (k and k.accu_actie == "ontladen"):
+            # De omvormer laadt in eigen verbruik door tot zijn eigen maximum (vaak 100%). Is de ingestelde bovengrens
+            # bereikt en heeft de zon overschot, dan houden we de lading vast: de zon voedt het huis, de rest gaat naar het net.
+            self._vol_vast = True
+            await self.huis.accu("vasthouden", 0, m.accu_soc)
+            b["accu"] = f"Accu is op de ingestelde grens ({self.cfg['accu']['max_soc']:.0f}%): lading vastgehouden, zon voedt het huis"
         elif k:
+            self._vol_vast = False
             vraag = k.huis_kwh + k.wp_kwh + k.auto_kwh - k.zon_kwh
             # Wat het plan voor dit kwartier wil laden, en wat de zon NU echt over heeft. Het plan rekent met de
             # zonvoorspelling; is het bewolkter dan verwacht, dan moet de rest uit het net komen, anders haalt de accu
