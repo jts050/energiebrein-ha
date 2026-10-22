@@ -35,6 +35,15 @@ WEB_TREFWOORDEN = [("alfen", "laadpaal", "Alfen Eve"), ("victron", "omvormer", "
                    ("easee", "laadpaal", "Easee"), ("zaptec", "laadpaal", "Zaptec"), ("abl", "laadpaal", "ABL")]
 
 
+def _s16(v):
+    """GoodWe geeft sommige stromen als 16-bits getal zonder teken: 65496 betekent -40."""
+    try:
+        v = int(v)
+    except Exception:
+        return v
+    return v - 65536 if v > 32767 else v
+
+
 def eigen_ip() -> str | None:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -291,7 +300,7 @@ async def test(soort: str, ip: str, extra: dict | None = None) -> dict:
             if d.get("battery_mode_label"):
                 accu_delen.append(f"accustand {d['battery_mode_label']}")
             if d.get("battery_discharge_limit") is not None:
-                accu_delen.append(f"accu mag ontladen {d['battery_discharge_limit']} A")
+                accu_delen.append(f"accu mag ontladen {abs(_s16(d['battery_discharge_limit']))} A")
             if d.get("battery_charge_limit") is not None:
                 accu_delen.append(f"laden {d['battery_charge_limit']} A")
             if d.get("battery_temperature") is not None:

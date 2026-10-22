@@ -774,7 +774,14 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
             <div class="f2"><label class="f">Stuur meldingen naar<select id="k-tel"><option value="">Geen meldingen</option></select></label><button class="btn" type="button" id="tel-test">Test</button></div>
             <p class="res" id="tel-res"></p>
             <label class="chk"><input type="checkbox" id="k-tel-op">Ook een melding als een storing is opgelost</label>
-            <p class="note">Staat je telefoon er niet tussen? Installeer de Home Assistant-app, log in en sta meldingen toe. Dan verschijnt hij hier als <code>mobile_app_…</code>.</p>
+          </div>
+          <div class="howto" style="margin-top:14px"><b>Als eigen app op je telefoon, zonder Home Assistant</b>
+            <ol><li>Installeer in Home Assistant de add-on <b>Tailscale</b> en log in. Zet de Tailscale-app op je telefoon met hetzelfde account.</li>
+            <li>Open op je telefoon <code id="tel-adres">http://homeassistant:8099</code> en kies <b>Zet op beginscherm</b>.</li>
+            <li>Stel hieronder een pincode in. Die vraagt Energiebrein alleen als je hem rechtstreeks opent, niet via Home Assistant.</li></ol></div>
+          <label class="f" style="margin-top:12px">Pincode (4 tot 12 cijfers, leeg = geen)<input id="k-pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="12"></label>
+          <div>
+            <p class="note">Staat je telefoon niet in de lijst met meldingen? Installeer de Home Assistant-app, log in en sta meldingen toe. Dan verschijnt hij als <code>mobile_app_…</code>.</p><p hidden> Installeer de Home Assistant-app, log in en sta meldingen toe. </p>
           </div>
         </div>
       </details>
@@ -1168,7 +1175,7 @@ async function laadInstellingen(){
   zet('k-huis',c.huis.jaarverbruik_kwh);zet('k-token',c.prijzen.entsoe_token);$('k-sim').checked=!!c.simulatie;
   $('ocppurl').textContent=`ws://${K.eigen_ip||'<ip-van-dit-apparaat>'}:${K.ocpp_poort}/laadpaal`;
   $('lpstatus').className='res '+(K.laadpaal_verbonden?'ok':'');$('lpstatus').textContent=K.laadpaal_verbonden?'Laadpaal is verbonden.':(c.simulatie?'In simulatie wordt de laadpaal nagebootst.':'Nog geen laadpaal verbonden.');
-  laadTelefoon((c.meldingen||{}).telefoon||'',(c.meldingen||{}).bij_opgelost!==false);
+  laadTelefoon((c.meldingen||{}).telefoon||'',(c.meldingen||{}).bij_opgelost!==false);zet('k-pin',(c.toegang||{}).pincode);
   toon();koppelStatus();modus();$('opslaan').hidden=true;
 }
 let TEL=null;
@@ -1248,6 +1255,7 @@ $('kform').addEventListener('submit',async e=>{e.preventDefault();
     warmtepomp:{type:$('k-wp-type').value,relais1:$('k-wp-r1').value.trim(),relais2:$('k-wp-r2').value.trim(),meter:$('k-wp-meter').value.trim(),vermogen_kw:n('k-wp-kw'),jaarverbruik_kwh:n('k-wp-jaar'),comfort_tijden:$('k-wp-comfort').value.split(/[,;]/).map(x=>x.trim().replace(/\s+/g,'').replace(/–/g,'-')).filter(x=>/^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(x)),blokkeer_uren_per_dag:n('k-wp-blok'),max_wacht_achter_elkaar_uur:n('k-wp-run'),niet_wachten_onder_c:n('k-wp-min')},
     huis:{jaarverbruik_kwh:n('k-huis')},
     meldingen:{telefoon:$('k-tel').value,bij_opgelost:$('k-tel-op').checked},
+    toegang:{pincode:$('k-pin').value.trim()},
     auto:{merk:$('k-car-merk').value,gebruiker:$('k-car-gebr').value.trim(),wachtwoord:$('k-car-ww').value,spin:$('k-car-spin').value.trim(),vin:$('k-car-vin').value.trim()}};
   $('bewaar').disabled=true;$('bewaarstatus').className='res';$('bewaarstatus').textContent='Opslaan en herstarten…';
   try{await api('/api/instellingen',data);$('bewaarstatus').className='res ok';$('bewaarstatus').textContent='Opgeslagen. Het brein draait met je nieuwe instellingen.';K=await api('/api/instellingen');await laadStatus();laadPlan();koppelStatus();setTimeout(()=>{$('opslaan').hidden=true;$('bewaarstatus').className='res';$('bewaarstatus').textContent='Je hebt wijzigingen die nog niet zijn opgeslagen.';},2500);}

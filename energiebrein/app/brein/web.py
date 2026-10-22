@@ -39,6 +39,7 @@ INSTELBAAR = {
     "huis": ["jaarverbruik_kwh"],
     "auto": ["merk", "gebruiker", "wachtwoord", "spin", "vin"],
     "meldingen": ["telefoon", "bij_opgelost"],
+    "toegang": ["pincode"],
 }
 
 
@@ -81,6 +82,10 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
         await staat["brein"].stop()
 
     app = FastAPI(title="Energiebrein", lifespan=levensduur)
+    from .toegang import Toegang
+    toegang = Toegang(lambda: staat["cfg"])
+    app.middleware("http")(toegang.middleware)
+    app.post("/api/aanmelden")(toegang.aanmelden)
     B = lambda: staat["brein"]
 
     @app.get("/")
@@ -363,6 +368,9 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
                                      "Controleer per dakvlak het vermogen: aantal panelen × wattpiek ÷ 1000.".replace(".", ",", 1))
         if not (0 <= float(cfg["accu"].get("min_soc", 10)) < float(cfg["accu"].get("max_soc", 100)) <= 100):
             raise HTTPException(400, "Laden tot moet hoger zijn dan Ontladen tot (bijvoorbeeld 90% en 10%).")
+        pin = str((cfg.get("toegang") or {}).get("pincode") or "").strip()
+        if pin and not (pin.isdigit() and 4 <= len(pin) <= 12):
+            raise HTTPException(400, "De pincode moet uit 4 tot 12 cijfers bestaan.")
         if cfg["accu"]["capaciteit_kwh"] > 200:
             raise HTTPException(400, "De accucapaciteit is groter dan 200 kWh. Vul de capaciteit in kWh in, niet in Wh.")
         config_pad.write_text("# Opgeslagen vanuit de app\n" + yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")

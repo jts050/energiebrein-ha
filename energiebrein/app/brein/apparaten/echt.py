@@ -136,7 +136,8 @@ class GoodWe:
             meter = d.get("active_power")
         self.meter_kw = None if meter is None else -float(meter) / 1000     # + = afname van het net, zoals de GoodWe-meter het ziet
         fout = d.get("battery_error") or d.get("battery_warning")
-        self.bms = {"ontladen_a": d.get("battery_discharge_limit"), "laden_a": d.get("battery_charge_limit"),
+        _a = lambda v: None if v is None else abs(v - 65536 if isinstance(v, int) and v > 32767 else v)
+        self.bms = {"ontladen_a": _a(d.get("battery_discharge_limit")), "laden_a": d.get("battery_charge_limit"),
                     "temperatuur": d.get("battery_temperature"), "stand": d.get("battery_mode_label"),
                     "fout": fout if fout not in (0, "0", "") else None}
         await self._controleer_stand()
