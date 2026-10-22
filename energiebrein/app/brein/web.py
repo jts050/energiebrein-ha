@@ -31,7 +31,7 @@ INSTELBAAR = {
     "locatie": ["breedte", "lengte"],
     "prijzen": ["bron", "entsoe_token", "tibber_token", "leverancier", "contract", "opslag", "terugleverkosten", "vast_inkoop", "vast_teruglever", "saldering"],
     "net": ["max_afname_kw", "p1"],
-    "omvormer": ["vermogen_kw", "type", "host", "modbus_poort", "modbus_unit", "aftoppen_bij_negatieve_prijs", "sturen", "gebruiker", "wachtwoord", "serienummer"],
+    "omvormer": ["vermogen_kw", "type", "host", "modbus_poort", "modbus_unit", "aftoppen_bij_negatieve_prijs", "meter_meet", "sturen", "gebruiker", "wachtwoord", "serienummer"],
     "zonnepanelen": None,
     "accu": ["capaciteit_kwh", "max_laden_kw", "max_ontladen_kw", "min_soc", "max_soc"],
     "laadpaal": ["type", "host", "fasen", "max_stroom_a", "auto_accu_kwh", "gebruiker", "wachtwoord", "serienummer"],

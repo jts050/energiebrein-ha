@@ -141,6 +141,13 @@ class Huis:
                     continue  # P1-meter is leidend voor het net
                 setattr(m, k, v)
         m.huis_kw = max(m.net_kw + m.zon_kw - m.accu_kw - m.auto_kw - m.wp_kw, 0.0)
+        ct = getattr(self.omvormer, "meter_kw", None)
+        if self.cfg["omvormer"].get("meter_meet", "net") == "huis" and ct is not None and self.p1:
+            # De CT-meter van de omvormer meet het hele huis (niet de hoofdaansluiting). Dan is dat het echte huisverbruik,
+            # en wat er aan zon bij komt bovenop de omvormer (andere zonne-omvormers) volgt uit de balans met de slimme meter.
+            totaal = max(ct, 0.0)
+            m.huis_kw = max(totaal - m.auto_kw - m.wp_kw, 0.0)
+            m.zon_kw = max(m.zon_kw, totaal + m.accu_kw - m.net_kw)
         return m
 
     # ---- knoppen ----

@@ -747,6 +747,8 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         </div>
         <p class="note" id="k-accu-kw"></p>
         <label class="chk"><input type="checkbox" id="k-aftop"> Panelen aftoppen als terugleveren geld kost</label>
+        <label class="chk"><input type="checkbox" id="k-huismeter"> De CT-meter van de omvormer meet alleen het huis (niet de hoofdaansluiting)</label>
+        <p class="note">Aanvinken als je ook andere zonne-omvormers hebt die de app niet uitleest: dan rekent Energiebrein het huisverbruik en de totale zon vanaf die meter.</p>
 
         </div>
       </details>
@@ -1047,7 +1049,7 @@ function renderStatus(){
   $('vandaag').innerHTML=`<div class="cijfer"><b>${eur(t.kosten)}</b><span>Stroomkosten</span></div><div class="cijfer goed"><b>${eur(t.kosten_zonder_accu-t.kosten)}</b><span>Bespaard door de accu</span></div><div class="cijfer"><b>${nf(t.zon_kwh)} kWh</b><span>Zon opgewekt</span></div><div class="cijfer"><b>${nf(t.afname_kwh)} kWh</b><span>Van het net</span></div>`;
   // apparaten
   const soc=Math.max(0,Math.min(100,m.accu_soc)),ak=m.accu_kw;
-  const r=[['var(--accu)','Thuisaccu',`${nf(S.accu_kwh*soc/100)} kWh${ak>0.05?` · laadt ${nf(ak)} kW`:ak<-0.05?` · levert ${nf(-ak)} kW`:' · wacht'}`,`${nf(soc,0)}%`],
+  const r=[['var(--accu)','Thuisaccu',`${nf(S.accu_kwh*soc/100)} kWh${S.accu_temp!=null?` · ${nf(S.accu_temp)} °C`:''}${ak>0.05?` · laadt ${nf(ak)} kW`:ak<-0.05?` · levert ${nf(-ak)} kW`:' · wacht'}`,`${nf(soc,0)}%`],
     ['var(--zon)','Zonnepanelen',`vandaag ${nf(t.zon_kwh)} kWh`,`${nf(m.zon_kw)} kW`]];
   if(a.laadpaal){const A=(S.auto||{}).auto||{};const soc2=A.soc!=null?`${nf(A.soc,0)}%`:'–';
     r.push(['var(--auto)','Auto',m.auto_verbonden?(m.auto_kw>0.05?`laadt ${nf(m.auto_kw)} kW`:'aangesloten'):'niet aangesloten',soc2]);}
@@ -1331,7 +1333,7 @@ async function laadInstellingen(){
   if(!LEV){LEV=await api('/api/leveranciers');$('k-lev').innerHTML=Object.entries(LEV.leveranciers).map(([id,l])=>`<option value="${id}">${esc(l.naam)}</option>`).join('')+'<option value="anders">Andere leverancier (zelf invullen)</option>';}
   $('k-lev').value=LEV.leveranciers[c.prijzen.leverancier]?c.prijzen.leverancier:'anders';levInfo();
   const zet=(id,v)=>{$(id).value=v??'';};
-  zet('k-omv-type',c.omvormer.type||'uit');zet('k-omv-host',c.omvormer.host);zet('k-mb-poort',c.omvormer.modbus_poort||502);zet('k-mb-unit',c.omvormer.modbus_unit??1);zet('k-gebr',c.omvormer.gebruiker);zet('k-ww',c.omvormer.wachtwoord);zet('k-serie',c.omvormer.serienummer);$('k-sturen').checked=!!c.omvormer.sturen;zet('k-sleutel',(c.net.p1||{}).sleutel);zet('k-lp-host',c.laadpaal.host);zet('k-tibber',c.prijzen.tibber_token);$('k-aftop').checked=!!c.omvormer.aftoppen_bij_negatieve_prijs;
+  zet('k-omv-type',c.omvormer.type||'uit');zet('k-omv-host',c.omvormer.host);zet('k-mb-poort',c.omvormer.modbus_poort||502);zet('k-mb-unit',c.omvormer.modbus_unit??1);zet('k-gebr',c.omvormer.gebruiker);zet('k-ww',c.omvormer.wachtwoord);zet('k-serie',c.omvormer.serienummer);$('k-sturen').checked=!!c.omvormer.sturen;$('k-huismeter').checked=c.omvormer.meter_meet==='huis';zet('k-sleutel',(c.net.p1||{}).sleutel);zet('k-lp-host',c.laadpaal.host);zet('k-tibber',c.prijzen.tibber_token);$('k-aftop').checked=!!c.omvormer.aftoppen_bij_negatieve_prijs;
   zet('k-accu-cap',c.accu.capaciteit_kwh);const okw=+c.omvormer.vermogen_kw||Math.max(c.accu.max_laden_kw,c.accu.max_ontladen_kw,1);zet('k-omv-kw',okw);zet('k-accu-in',Math.round(c.accu.max_laden_kw/okw*100));zet('k-accu-uit',Math.round(c.accu.max_ontladen_kw/okw*100));accuKw();zet('k-accu-min',c.accu.min_soc);zet('k-accu-max',c.accu.max_soc??100);
   zet('k-p1-type',(c.net.p1||{}).type||'uit');zet('k-p1-host',(c.net.p1||{}).host);zet('k-maxkw',c.net.max_afname_kw);
   zet('k-lp-type',c.laadpaal.type||'uit');const ca=c.auto||{};zet('k-car-merk',ca.merk||'uit');zet('k-car-gebr',ca.gebruiker);zet('k-car-ww',ca.wachtwoord);zet('k-car-spin',ca.spin);zet('k-car-vin',ca.vin);zet('k-lp-gebr',c.laadpaal.gebruiker);zet('k-lp-ww',c.laadpaal.wachtwoord);zet('k-lp-serie',c.laadpaal.serienummer);zet('k-lp-fasen',c.laadpaal.fasen);zet('k-lp-a',c.laadpaal.max_stroom_a);zet('k-lp-auto',c.laadpaal.auto_accu_kwh);
@@ -1415,7 +1417,7 @@ $('kform').addEventListener('submit',async e=>{e.preventDefault();
     locatie:{breedte:n('k-lat'),lengte:n('k-lon')},
     prijzen:{leverancier:$('k-lev').value,tibber_token:$('k-tibber').value.trim(),bron:$('k-token').value.trim()?'entsoe':'energyzero',entsoe_token:$('k-token').value.trim(),contract:$('k-contract').value,saldering:$('k-sald').value,opslag:n('k-opslag'),terugleverkosten:n('k-terug'),vast_inkoop:n('k-vin'),vast_teruglever:n('k-vterug')},
     net:{max_afname_kw:n('k-maxkw'),p1:{type:$('k-p1-type').value,host:$('k-p1-host').value.trim(),sleutel:$('k-sleutel').value.trim()}},
-    omvormer:{vermogen_kw:n('k-omv-kw'),type:$('k-omv-type').value,host:$('k-omv-host').value.trim(),modbus_poort:parseInt($('k-mb-poort').value)||502,modbus_unit:parseInt($('k-mb-unit').value)||1,sturen:$('k-sturen').checked,gebruiker:$('k-gebr').value.trim(),wachtwoord:$('k-ww').value,serienummer:$('k-serie').value.trim(),aftoppen_bij_negatieve_prijs:$('k-aftop').checked},
+    omvormer:{vermogen_kw:n('k-omv-kw'),type:$('k-omv-type').value,host:$('k-omv-host').value.trim(),modbus_poort:parseInt($('k-mb-poort').value)||502,modbus_unit:parseInt($('k-mb-unit').value)||1,sturen:$('k-sturen').checked,gebruiker:$('k-gebr').value.trim(),wachtwoord:$('k-ww').value,serienummer:$('k-serie').value.trim(),aftoppen_bij_negatieve_prijs:$('k-aftop').checked,meter_meet:$('k-huismeter').checked?'huis':'net'},
     zonnepanelen:[...document.querySelectorAll('.vlak')].map(d=>({kwp:parseFloat(d.querySelector('.v-kwp').value)||0,hoek:parseFloat(d.querySelector('.v-hoek').value)||0,richting:parseFloat(d.querySelector('.v-richting').value)})),
     accu:{capaciteit_kwh:n('k-accu-cap'),max_laden_kw:Math.round(n('k-omv-kw')*(n('k-accu-in')||100))/100,max_ontladen_kw:Math.round(n('k-omv-kw')*(n('k-accu-uit')||100))/100,min_soc:n('k-accu-min'),max_soc:n('k-accu-max')||100},
     laadpaal:{type:$('k-lp-type').value,host:$('k-lp-host').value.trim(),gebruiker:$('k-lp-gebr').value.trim(),wachtwoord:$('k-lp-ww').value,serienummer:$('k-lp-serie').value.trim(),fasen:parseInt($('k-lp-fasen').value),max_stroom_a:n('k-lp-a'),auto_accu_kwh:n('k-lp-auto')},

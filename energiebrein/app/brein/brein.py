@@ -473,7 +473,7 @@ class Brein:
                         "knop": {"tekst": f"Ondergrens op {max(10, int(self.cfg['accu']['min_soc']))}% zetten", "actie": "ondergrens",
                                  "waarde": max(10, int(self.cfg["accu"]["min_soc"]))}})
         mk = getattr(omv, "meter_kw", None)
-        if mk is not None and m and self.huis.p1 and abs(m.net_kw - mk) > 1.0 and m.net_kw > 0.8:
+        if mk is not None and m and self.huis.p1 and self.cfg["omvormer"].get("meter_meet", "net") != "huis" and abs(m.net_kw - mk) > 1.0 and m.net_kw > 0.8:
             uit.append({"ernst": "let op", "apparaat": "omvormer", "titel": "De meter van de GoodWe ziet iets anders dan je slimme meter",
                         "uitleg": f"Je slimme meter meet {self._k(m.net_kw)} kW van het net, de CT-meter van de GoodWe {self._k(mk)} kW. "
                                   "De accu voedt alleen wat zijn eigen meter ziet. Zit die meter niet op de hoofdaansluiting (alle fasen), "
@@ -520,4 +520,5 @@ class Brein:
                 "storingen": self.storingen(), "tibber": {"actief": bool(self.prijzen.tibber), "fout": self.prijzen.tibber_fout},
                 "accu_kwh": self.cfg["accu"]["capaciteit_kwh"], "max_afname_kw": self.cfg["net"]["max_afname_kw"],
                 "plan_samenvatting": self.plan["samenvatting"], "licentie": self.licentie.status(),
-                "auto": self.auto_overzicht()}
+                "auto": self.auto_overzicht(),
+                "accu_temp": (getattr(self.huis.omvormer, "bms", None) or {}).get("temperatuur")}
