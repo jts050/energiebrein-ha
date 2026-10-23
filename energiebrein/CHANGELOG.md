@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.6.3
+
+- P1-regeling opnieuw gebouwd: hij stelt het opdrachtvermogen stap voor stap bij tot de slimme meter op 0 kW staat. Dat werkt ook als de omvormer het opgegeven vermogen anders telt dan gedacht. Zonne-overschot gaat zo de accu in, zonder stroom uit het net.
+
 ## 1.6.2
 
 - Bij terugverkopen toont Thuis wat er echt gebeurt (gemeten), niet wat er gevraagd is.

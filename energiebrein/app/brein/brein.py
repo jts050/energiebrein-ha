@@ -1,6 +1,7 @@
 """Het brein: haalt prijzen en voorspellingen op, maakt elk kwartier een plan en stuurt elke paar seconden bij."""
 from __future__ import annotations
 import asyncio
+import time
 import logging
 import math
 from collections import deque
@@ -213,9 +214,15 @@ class Brein:
         if self.cfg["omvormer"].get("regel", "omvormer") != "p1" or not self.huis.p1 or not self.huis.kan_accu_sturen:
             await self.huis.accu("zelfverbruik")
             return
-        gewenst = m.accu_kw - m.net_kw                      # + laden: net > 0 (afname) betekent minder laden / meer ontladen
-        vorige = getattr(self, "_p1_vorige", 0.0)
-        gewenst = vorige + 0.7 * (gewenst - vorige)         # dempen, anders slingert het
+        # Integrerende regeling: het vorige opdrachtvermogen wordt bijgesteld met wat de P1 nog afwijkt van 0. Zo komt de P1 op 0
+        # uit, ook als de omvormer het opgegeven vermogen anders telt (bijvoorbeeld bovenop wat de zon al in de accu stopt).
+        nu = time.monotonic()
+        if getattr(self, "_p1_vorige", None) is None or nu - getattr(self, "_p1_tijd", 0.0) > 90:
+            self._p1_vorige = m.accu_kw                         # start vanaf wat de accu nu echt doet
+        self._p1_tijd = nu
+        gewenst = self._p1_vorige - 0.7 * m.net_kw              # net > 0 (afname): minder laden / meer ontladen
+        if abs(m.net_kw) < 0.1:
+            gewenst = self._p1_vorige                           # dicht genoeg bij 0: niet bijstellen
         if m.accu_soc >= float(a.get("max_soc", 100)) and gewenst > 0:
             gewenst = 0.0
         if m.accu_soc <= self.ondergrens() + 0.5 and gewenst < 0:
