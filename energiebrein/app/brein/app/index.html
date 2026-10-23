@@ -603,6 +603,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 .handel a{color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--faint);cursor:pointer}
 /* koppelen: geavanceerde meting en regeling */
 .extra.meet{margin-top:10px;border-top:1px solid var(--hair);padding-top:12px}
+.fasetest table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin:4px 0}.fasetest th,.fasetest td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--hair)}.fasetest th:first-child,.fasetest td:first-child{text-align:left}.fasetest tr.af td{color:var(--bad)}.fase-kop{margin:16px 0 4px;font-size:14px}
 </style>
 </head>
 <body>
@@ -795,6 +796,9 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
           <p class="note">Alleen aanzetten als de CT-meter van de omvormer niet goed meet. Normaal regelt de omvormer zelf, sneller en preciezer.</p>
           <label class="chk"><input type="checkbox" id="k-huismeter"> De CT-meter van de omvormer meet alleen het huis (niet de hoofdaansluiting)</label>
           <p class="note">Aanvinken als je ook andere zonne-omvormers hebt die de app niet uitleest: dan rekent Energiebrein het huisverbruik en de totale zon vanaf die meter.</p>
+          <h4 class="fase-kop">CT-klemmen testen, per fase</h4>
+          <div id="k-fasen" class="fasetest"></div>
+          <p class="note">Zet één apparaat aan dat op één fase zit, zoals de waterkoker. Dat vermogen hoort bij de slimme meter én bij de omvormer op dezelfde fase te verschijnen, ongeveer even groot. Ziet de omvormer het op een andere fase of maar half zo groot, dan zit die klem op de verkeerde fase (of de spanningsdraad van die fase). Zelfde getal met het omgekeerde teken: klem andersom. De getallen verversen vanzelf.</p>
         </details>
 
         </div>
@@ -1067,7 +1071,14 @@ function renderStroom(m,a){
 
 /* ---------- status ---------- */
 function groet(){const h=new Date().getHours();return h<6?'Goedenacht':h<12?'Goedemorgen':h<18?'Goedemiddag':'Goedenavond';}
+function renderFasen(){
+  const el=$('k-fasen');if(!el)return;const f=S.fasen||{};
+  if(!f.p1||!f.omvormer){el.innerHTML='<p class="note">Per fase vergelijken kan als je slimme meter en de omvormer allebei waarden per fase geven (HomeWizard P1 en GoodWe doen dat).</p>';return;}
+  el.innerHTML='<table><tr><th></th><th>Slimme meter</th><th>Omvormer</th><th>Verschil</th></tr>'+[0,1,2].map(i=>{const p=f.p1[i],o=f.omvormer[i],d=o-p;
+    return `<tr class="${Math.abs(d)>0.3?'af':''}"><td>L${i+1}</td><td>${nf(p,2)} kW</td><td>${nf(o,2)} kW</td><td>${(d>0?'+':'')+nf(d,2)} kW</td></tr>`;}).join('')+'</table><p class="note">+ is afname van het net, − is terugleveren.</p>';
+}
 function renderStatus(){
+  renderFasen();
   const m=S.meting,b=S.besluit||{},a=S.apparaten||{},v=S.voorspelling||{},ai=v.ai_huis||{};
   const st=(S.storingen||[]).filter(x=>x.ernst!=='info'), storing=st.length;
   $('railvoet').innerHTML=`<span><i class="stip ${S.simulatie?'warn':''}"></i>${S.simulatie?'Simulatie':'Je eigen huis'}</span>

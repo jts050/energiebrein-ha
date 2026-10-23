@@ -1,5 +1,10 @@
 # Wat er nieuw is
 
+## 1.6.7
+
+- **CT-klemmen testen, per fase.** Bij Koppelen → Meting en regeling zie je live per fase wat je slimme meter en de omvormer meten. Zo zie je meteen welke klem op de verkeerde fase zit of andersom.
+- Geen vals alarm "Accu doet iets anders dan Energiebrein vraagt" meer vlak nadat Energiebrein zelf een nieuwe stand heeft gestuurd. De omvormer heeft even nodig om die over te nemen.
+
 ## 1.6.6
 
 - **Zonne-overschot gaat altijd eerst de accu in** zolang die ruimte heeft. Dit staat standaard aan, onder Koppelen → Slim handelen. Met saldering levert terugleveren bijna evenveel op als zelf gebruiken, en dan vond het plan opslaan in de accu de moeite niet waard. Nu gaat de zon voor.

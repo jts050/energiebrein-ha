@@ -235,6 +235,8 @@ class GoodWe:
             self.afwijking = (f"De omvormer staat in EMS-modus {ems}. Die gaat vóór de werkmodus en wordt niet door Energiebrein ingesteld; "
                               "waarschijnlijk stuurt een andere partij (bijvoorbeeld je energieleverancier via de GoodWe-cloud, of een instelling "
                               "in de SolarGo-app) de accu aan.")
+        elif (nu - getattr(self, "_opdracht_tijd", datetime.min.replace(tzinfo=timezone.utc))).total_seconds() < 90:
+            pass        # net een nieuwe opdracht gestuurd: de omvormer heeft even nodig om die over te nemen, nog niet vergelijken
         elif verwacht and wm and wm != verwacht and not wm.startswith("niet") and not (verwacht in EIGEN_VERBRUIK and wm in EIGEN_VERBRUIK):
             wm = {"ECO": "TOU-modus (tijdschema)", "ECO_CHARGE": "TOU-modus met laadschema", "ECO_DISCHARGE": "TOU-modus met ontlaadschema"}.get(wm, wm)
             verwacht = "eigen verbruik" if verwacht in EIGEN_VERBRUIK else verwacht
@@ -293,6 +295,7 @@ class GoodWe:
             # vermogen uit het net en dat schema blijft in de omvormer staan. Daarom gewoon eigen verbruik.
             opdracht = (self._eigen_verbruik(), 100, 100)
         if opdracht != self._laatste_opdracht:
+            self._opdracht_tijd = datetime.now(timezone.utc)
             await self.inv.set_operation_mode(*opdracht)
             log.info("GoodWe: %s %s%% doel %s%%", opdracht[0].name, opdracht[1], opdracht[2])
             if opdracht[0].name in EIGEN_VERBRUIK:

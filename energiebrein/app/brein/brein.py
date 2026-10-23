@@ -765,6 +765,7 @@ class Brein:
                                     "min_ingesteld": float(self.cfg["accu"]["min_soc"]), "min_omvormer": self._omvormer_grens(),
                                     "terugverkopen": mag_verkopen(self.cfg["accu"]),
                                     "min_winst": float(self.cfg["accu"].get("min_winst_per_kwh", 0.0) or 0.0)},
+                "fasen": {"p1": getattr(self.huis.p1, "fasen", None), "omvormer": getattr(self.huis.omvormer, "meter_fasen", None)},
                 "prijsbron": self.prijzen.bron, "simulatie": bool(self.huis.sim),
                 "apparaten": self.huis.onderdelen(), "fouten": self.huis.fouten, "meldingen": self.huis.meldingen,
                 "storingen": self.storingen(), "tibber": {"actief": bool(self.prijzen.tibber), "fout": self.prijzen.tibber_fout},
