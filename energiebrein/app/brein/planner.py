@@ -39,6 +39,11 @@ def _euro(x: float) -> str:
     return f"€ {x:.2f}".replace(".", ",")
 
 
+def zon_in_accu(c: dict) -> bool:
+    """Gaat zonne-overschot altijd eerst de accu in (zolang die ruimte heeft)? Standaard wel."""
+    return c.get("zon_altijd_in_accu", True) not in (False, "uit", "nee", 0)
+
+
 def mag_verkopen(c: dict) -> bool:
     """Mag de accu stroom aan het net verkopen? Standaard wel; uit = de accu voedt alleen het eigen huis."""
     return c.get("terugverkopen", True) not in (False, "uit", "nee", 0)
@@ -217,6 +222,7 @@ class Planner:
         # voor een paar cent verschil, waar na laadverlies, slijtage en een verkeerde voorspelling niets van overblijft.
         slijt = float(c.get("slijtage_per_kwh", 0.02)) + max(float(c.get("min_winst_per_kwh", 0.0) or 0.0), 0.0)
         verkopen = mag_verkopen(c)
+        zon_eerst = zon_in_accu(c)
         N = max(10, min(400, int((hi - lo) / 0.05)))
         stap = (hi - lo) / N
         up, dn = max(1, int(c["max_laden_kw"] * Q / stap)), max(1, int(c["max_ontladen_kw"] * Q / stap))
@@ -241,6 +247,9 @@ class Planner:
             if not verkopen:
                 # niet terugverkopen: ontladen mag alleen zolang het de vraag van het huis dekt, nooit naar het net
                 geldig &= ~((d < 0) & (g < min(netto, 0.0) - 1e-9))[None, :]
+            if zon_eerst and netto < -1e-9 and not (aftoppen_mag and k.teruglever < 0):
+                # zonne-overschot: niet terugleveren zolang de accu het kan opnemen (vol laden of de accu zit vol)
+                geldig &= (g >= -1e-9)[None, :] | (deltas == up)[None, :] | (doel >= N)
             totaal = np.where(geldig, kost[None, :] + V[np.clip(doel, 0, N)], np.inf)
             # bij gelijke kosten: liever niets doen (minder slijtage)
             totaal += np.abs(deltas)[None, :] * 1e-6

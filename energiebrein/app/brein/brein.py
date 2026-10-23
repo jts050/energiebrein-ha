@@ -12,7 +12,7 @@ from .apparaten import Huis
 from .config import data_map
 from .geschiedenis import Geschiedenis
 from .model import Bediening, Kwartier, Meting
-from .planner import Planner, AutoStatus, mag_verkopen
+from .planner import zon_in_accu, Planner, AutoStatus, mag_verkopen
 from .prijzen import Prijzen, kwartier_start
 from .voorspelling import Voorspelling
 
@@ -322,7 +322,16 @@ class Brein:
             # zijn doel niet en mis je straks de dure uren.
             plan_kw = max(k.accu_kwh, 0.0) / 0.25 / math.sqrt(float(a.get("rendement", 0.9)))
             overschot_nu = m.zon_kw - (m.huis_kw + m.wp_kw + m.auto_kw)
-            if k.accu_actie == "laden" and vraag < -0.02 and overschot_nu >= 0.8 * plan_kw:
+            # Zonne-overschot gaat altijd eerst de accu in zolang die ruimte heeft (instelling, standaard aan). Ook als het plan
+            # iets anders verwachtte: de zonvoorspelling zit er vaak naast, en wat de zon NU over heeft, telt.
+            zon_eerst = (zon_in_accu(a) and overschot_nu > 0.15 and m.accu_soc < float(a.get("max_soc", 100)) - 0.5
+                         and k.accu_actie != "laden" and not (k.accu_actie == "ontladen" and k.net_kwh < -0.02)
+                         )
+            if zon_eerst:
+                await self._eigen(m)
+                b["accu"] = "Laadt met zonne-overschot"
+                reden = self._zon_reden(m) or "Wat de zon over heeft, gaat eerst de accu in (zo ingesteld bij Koppelen)."
+            elif k.accu_actie == "laden" and vraag < -0.02 and overschot_nu >= 0.8 * plan_kw:
                 await self._eigen(m)
                 b["accu"] = "Laadt met zonne-overschot"
                 reden = self._zon_reden(m) or reden

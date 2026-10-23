@@ -1,5 +1,10 @@
 # Wat er nieuw is
 
+## 1.6.6
+
+- **Zonne-overschot gaat altijd eerst de accu in** zolang die ruimte heeft. Dit staat standaard aan, onder Koppelen → Slim handelen. Met saldering levert terugleveren bijna evenveel op als zelf gebruiken, en dan vond het plan opslaan in de accu de moeite niet waard. Nu gaat de zon voor.
+- Opgelost: had het plan minder zon verwacht en wilde het de lading vasthouden, dan ging echt zonne-overschot naar het net. Nu telt wat de zon op dit moment over heeft.
+
 ## 1.6.5
 
 - Opgelost: de accu kon in stand-by blijven hangen. De GoodWe neemt de stand-by soms pas na een paar seconden over; Energiebrein keek te vroeg, dacht dat het niet lukte en vergat de stand-by weer uit te zetten. Daarna laadde de accu niet meer, ook niet met zonne-overschot. Nu kijkt hij een paar keer na, en staat de accu in stand-by terwijl Energiebrein dat niet vraagt, dan zet hij hem zelf terug op automatisch.
