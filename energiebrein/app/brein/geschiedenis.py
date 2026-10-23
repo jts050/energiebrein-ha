@@ -67,10 +67,22 @@ class Geschiedenis:
             uit.append({**self._lopend, "start": self._lopend["start"].isoformat()})
         return uit
 
+    def soc_voor(self, t: datetime) -> float | None:
+        """Laadtoestand van de accu aan het eind van het laatste kwartier vóór t (binnen 6 uur), als die bekend is."""
+        with self.lock:
+            r = self.db.execute("SELECT soc FROM kwartier WHERE start < ? AND start >= ? AND soc IS NOT NULL ORDER BY start DESC LIMIT 1",
+                                (t.astimezone(timezone.utc).isoformat(), (t - timedelta(hours=6)).astimezone(timezone.utc).isoformat())).fetchone()
+        return float(r[0]) if r else None
+
     def vandaag(self) -> dict:
         nu = datetime.now().astimezone()
-        rows = self.rijen(nu.replace(hour=0, minute=0, second=0, microsecond=0))
-        som = lambda k: sum(r[k] for r in rows)
+        middernacht = nu.replace(hour=0, minute=0, second=0, microsecond=0)
+        rows = self.rijen(middernacht)
+        som = lambda k: sum(r[k] or 0 for r in rows)
+        begin = self.soc_voor(middernacht)
+        if begin is None and rows and rows[0].get("soc") is not None:
+            begin = float(rows[0]["soc"])
         return {"kosten": som("kosten"), "kosten_zonder_accu": som("kosten_zonder"),
-                "zon_kwh": som("zon_kwh"), "afname_kwh": sum(max(r["net_kwh"], 0) for r in rows),
-                "teruglevering_kwh": -sum(min(r["net_kwh"], 0) for r in rows), "kwartieren": len(rows)}
+                "zon_kwh": som("zon_kwh"), "afname_kwh": sum(max(r["net_kwh"] or 0, 0) for r in rows),
+                "teruglevering_kwh": -sum(min(r["net_kwh"] or 0, 0) for r in rows), "kwartieren": len(rows),
+                "soc_begin": begin}

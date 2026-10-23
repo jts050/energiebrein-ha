@@ -39,9 +39,21 @@ def _euro(x: float) -> str:
     return f"€ {x:.2f}".replace(".", ",")
 
 
+def mag_verkopen(c: dict) -> bool:
+    """Mag de accu stroom aan het net verkopen? Standaard wel; uit = de accu voedt alleen het eigen huis."""
+    return c.get("terugverkopen", True) not in (False, "uit", "nee", 0)
+
+
 class Planner:
     def __init__(self, cfg: dict):
         self.cfg = cfg
+        self.ondergrens: float | None = None   # ondergrens die de omvormer zelf hanteert (%), als die hoger is
+        self._e_start = 0.0
+        self._eindwaarde = 0.0
+
+    def ondergrens_pct(self) -> float:
+        """De accu ontlaadt niet verder dan de hoogste van twee grenzen: die in Energiebrein en die in de omvormer."""
+        return max(float(self.cfg["accu"]["min_soc"]), float(self.ondergrens or 0))
 
     # ---------------------------------------------------------------
     def maak(self, kw: list[Kwartier], soc_nu: float, bed: Bediening, auto: AutoStatus,
@@ -196,10 +208,15 @@ class Planner:
         """Dynamisch programmeren over de laadtoestand in stapjes van ~50 Wh (gevectoriseerd met numpy)."""
         c = self.cfg["accu"]
         cap = c["capaciteit_kwh"]
-        lo, hi = cap * c["min_soc"] / 100, cap * c["max_soc"] / 100
+        lo, hi = cap * self.ondergrens_pct() / 100, cap * c["max_soc"] / 100
+        if hi - lo < 0.5:                                  # grenzen te dicht op elkaar: altijd iets ruimte houden
+            hi = min(cap, lo + 0.5)
         aftoppen_mag = self.cfg.get("omvormer", {}).get("aftoppen_bij_negatieve_prijs", True)
         eta = math.sqrt(c["rendement"])
-        slijt = float(c.get("slijtage_per_kwh", 0.02))    # slijtage van de accu per geladen kWh
+        # Per geladen kWh: slijtage plus de winst die het minstens moet opleveren. Zo laadt en ontlaadt de accu niet
+        # voor een paar cent verschil, waar na laadverlies, slijtage en een verkeerde voorspelling niets van overblijft.
+        slijt = float(c.get("slijtage_per_kwh", 0.02)) + max(float(c.get("min_winst_per_kwh", 0.0) or 0.0), 0.0)
+        verkopen = mag_verkopen(c)
         N = max(10, min(400, int((hi - lo) / 0.05)))
         stap = (hi - lo) / N
         up, dn = max(1, int(c["max_laden_kw"] * Q / stap)), max(1, int(c["max_ontladen_kw"] * Q / stap))
@@ -221,6 +238,9 @@ class Planner:
             kost = np.where(g > 0, g * k.inkoop, g * terug) + np.where(d > 0, d * slijt, 0.0)   # per keuze, incl. slijtage
             doel = idx[:, None] + deltas[None, :]                              # (N+1, keuzes)
             geldig = (doel >= 0) & (doel <= N)
+            if not verkopen:
+                # niet terugverkopen: ontladen mag alleen zolang het de vraag van het huis dekt, nooit naar het net
+                geldig &= ~((d < 0) & (g < min(netto, 0.0) - 1e-9))[None, :]
             totaal = np.where(geldig, kost[None, :] + V[np.clip(doel, 0, N)], np.inf)
             # bij gelijke kosten: liever niets doen (minder slijtage)
             totaal += np.abs(deltas)[None, :] * 1e-6
@@ -228,6 +248,7 @@ class Planner:
             keuze[t] = deltas[beste]
             V = totaal[idx, beste]
         i = int(round((min(max(cap * soc_nu / 100, lo), hi) - lo) / stap))
+        self._e_start, self._eindwaarde = lo + i * stap, eindwaarde
         for t, k in enumerate(kw):
             dj = int(keuze[t][i])
             d = dj * stap
@@ -246,6 +267,7 @@ class Planner:
         self._redenen(kw)
 
     def _redenen(self, kw: list[Kwartier]) -> None:
+        eta = math.sqrt(self.cfg["accu"]["rendement"])
         duur = sorted(k.inkoop for k in kw)
         hoog = duur[int(len(duur) * 0.75)] if duur else 0
         for idx, k in enumerate(kw):
@@ -253,8 +275,11 @@ class Planner:
             later = max((x.inkoop for x in kw[idx:idx + 48]), default=k.inkoop)
             if k.aftoppen:
                 k.reden = f"Terugleveren kost nu geld ({_euro(k.teruglever)}), panelen worden afgetopt."
-            elif k.accu_actie == "laden" and over > 0.05:
+            elif k.accu_actie == "laden" and over >= 0.8 * k.accu_kwh / eta:
                 k.reden = "Zonne-overschot gaat de accu in in plaats van het net op."
+            elif k.accu_actie == "laden" and over > 0.05:
+                k.reden = (f"Laadt met zon en goedkope stroom uit het net ({_euro(k.inkoop)}); "
+                           f"later loopt de prijs op tot {_euro(later)}.")
             elif k.accu_actie == "laden":
                 k.reden = f"Goedkoop laden voor {_euro(k.inkoop)}; later loopt de prijs op tot {_euro(later)}."
             elif k.accu_actie == "ontladen" and k.net_kwh < -0.02:
@@ -263,7 +288,7 @@ class Planner:
                            + (", het duurste moment van het komende etmaal." if duurste else "; dat levert nu meer op dan de lading bewaren."))
             elif k.accu_actie == "ontladen":
                 k.reden = f"Accu voedt het huis, inkoop zou {_euro(k.inkoop)} kosten."
-            elif k.inkoop >= hoog and k.soc_na <= float(self.cfg["accu"]["min_soc"]) + 1:
+            elif k.inkoop >= hoog and k.soc_na <= self.ondergrens_pct() + 1:
                 k.reden = f"Dure periode ({_euro(k.inkoop)}), maar de accu is leeg (op de ondergrens): het huis haalt stroom uit het net."
             elif k.inkoop >= hoog:
                 k.reden = "Dure periode, maar de accu bewaart zijn lading voor een nog duurder moment."
@@ -282,8 +307,11 @@ class Planner:
         for k in kw:
             g = k.huis_kwh + k.wp_kwh + k.auto_kwh - k.zon_kwh
             zonder += g * (k.inkoop if g > 0 else k.teruglever)
+        # Wat er aan het eind meer (of minder) in de accu zit dan nu, telt mee: die lading is betaald maar nog niet gebruikt.
+        voorraad = kw[-1].soc_na / 100 * self.cfg["accu"]["capaciteit_kwh"] - self._e_start
         return {"kosten_plan": round(met, 2), "kosten_zonder_accu": round(zonder, 2),
-                "besparing": round(zonder - met, 2), "kwartieren": len(kw),
+                "besparing": round(zonder - met + voorraad * self._eindwaarde, 2), "voorraad_kwh": round(voorraad, 1),
+                "kwartieren": len(kw),
                 "tot": (kw[-1].start + timedelta(minutes=15)).isoformat(),
                 "goedkoopste": min(kw, key=lambda k: k.inkoop).start.isoformat(),
                 "duurste": max(kw, key=lambda k: k.inkoop).start.isoformat()}

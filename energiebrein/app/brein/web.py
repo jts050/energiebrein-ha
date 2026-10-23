@@ -33,7 +33,7 @@ INSTELBAAR = {
     "net": ["max_afname_kw", "p1"],
     "omvormer": ["vermogen_kw", "type", "host", "modbus_poort", "modbus_unit", "aftoppen_bij_negatieve_prijs", "meter_meet", "regel", "sturen", "gebruiker", "wachtwoord", "serienummer"],
     "zonnepanelen": None,
-    "accu": ["capaciteit_kwh", "max_laden_kw", "max_ontladen_kw", "min_soc", "max_soc"],
+    "accu": ["capaciteit_kwh", "max_laden_kw", "max_ontladen_kw", "min_soc", "max_soc", "min_winst_per_kwh", "terugverkopen"],
     "laadpaal": ["type", "host", "fasen", "max_stroom_a", "auto_accu_kwh", "gebruiker", "wachtwoord", "serienummer"],
     "warmtepomp": ["type", "relais1", "relais2", "meter", "vermogen_kw", "jaarverbruik_kwh", "blokkeer_uren_per_dag", "max_wacht_achter_elkaar_uur", "niet_wachten_onder_c", "comfort_tijden"],
     "huis": ["jaarverbruik_kwh"],
@@ -204,7 +204,9 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
     async def opbrengst_api(dagen: int = 30):
         from .opbrengst import opbrengst
         nu = datetime.now(timezone.utc)
-        return opbrengst(B().gesch.rijen(nu - timedelta(days=dagen + 1), nu + timedelta(days=1)), B().prijzen, dagen)
+        a = staat["cfg"]["accu"]
+        return opbrengst(B().gesch.rijen(nu - timedelta(days=dagen + 1), nu + timedelta(days=1)), B().prijzen, dagen,
+                         float(a.get("capaciteit_kwh") or 0), float(a.get("rendement", 0.9)) ** 0.5)
 
     @app.get("/api/leveranciers")
     async def leveranciers():
@@ -371,6 +373,12 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
         pin = str((cfg.get("toegang") or {}).get("pincode") or "").strip()
         if pin and not (pin.isdigit() and 4 <= len(pin) <= 12):
             raise HTTPException(400, "De pincode moet uit 4 tot 12 cijfers bestaan.")
+        try:
+            winst = float(cfg["accu"].get("min_winst_per_kwh", 0.03) or 0)
+        except (TypeError, ValueError):
+            winst = -1
+        if not 0 <= winst <= 1:
+            raise HTTPException(400, "De minimale winst per kWh moet tussen € 0 en € 1 liggen (bijvoorbeeld 0,03).")
         if cfg["accu"]["capaciteit_kwh"] > 200:
             raise HTTPException(400, "De accucapaciteit is groter dan 200 kWh. Vul de capaciteit in kWh in, niet in Wh.")
         config_pad.write_text("# Opgeslagen vanuit de app\n" + yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")

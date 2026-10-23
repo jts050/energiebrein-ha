@@ -10,7 +10,7 @@ from .apparaten import Huis
 from .config import data_map
 from .geschiedenis import Geschiedenis
 from .model import Bediening, Kwartier, Meting
-from .planner import Planner, AutoStatus
+from .planner import Planner, AutoStatus, mag_verkopen
 from .prijzen import Prijzen, kwartier_start
 from .voorspelling import Voorspelling
 
@@ -120,8 +120,18 @@ class Brein:
         m = self.meting
         self._zet_autodoel(nu)
         auto = AutoStatus(verbonden=bool(m and m.auto_verbonden), geladen_kwh=self.auto_geladen(m))
+        self.planner.ondergrens = self._omvormer_grens()
         self.plan = self.planner.maak(kw, m.accu_soc if m else 50.0, self.bed, auto, self.voorsp.wp_dag_kwh)
         log.info("Nieuw plan: %d kwartieren, verwachte besparing %s", len(kw), self.plan["samenvatting"].get("besparing"))
+
+    def _omvormer_grens(self) -> float | None:
+        """Ondergrens die de omvormer zelf hanteert (bij GoodWe de ontlaaddiepte), als hij die meldt."""
+        g = (getattr(self.huis.omvormer, "stand", None) or {}).get("ondergrens_pct")
+        return float(g) if g is not None else None
+
+    def ondergrens(self) -> float:
+        """Tot hoever de accu echt leeg kan: de hoogste van de grens in Energiebrein en die in de omvormer."""
+        return max(float(self.cfg["accu"]["min_soc"]), self._omvormer_grens() or 0.0)
 
     def bewaar_bediening(self):
         import json as _j
@@ -206,7 +216,7 @@ class Brein:
         gewenst = vorige + 0.7 * (gewenst - vorige)         # dempen, anders slingert het
         if m.accu_soc >= float(a.get("max_soc", 100)) and gewenst > 0:
             gewenst = 0.0
-        if m.accu_soc <= float(a.get("min_soc", 0)) and gewenst < 0:
+        if m.accu_soc <= self.ondergrens() + 0.5 and gewenst < 0:
             gewenst = 0.0
         gewenst = max(-a["max_ontladen_kw"], min(a["max_laden_kw"], gewenst))
         kw = round(gewenst / 0.4) * 0.4                     # stapjes van 0,4 kW: niet elke paar seconden een nieuwe opdracht
@@ -237,12 +247,24 @@ class Brein:
 
         b = {}
         self._p1_tekst = None
+        a = self.cfg["accu"]
+        # Uitleg onder het besluit. Standaard die van het plan; wijkt het besluit van dit moment af van het plan,
+        # dan een eigen uitleg (anders staat er bijvoorbeeld 'houdt lading vast' met daaronder 'accu voedt het huis').
+        reden = k.reden if k else ""
+        grens = self.ondergrens()
+        leeg = m.accu_soc <= grens + 0.5
+        leeg_tekst = f"Accu is leeg (op de ondergrens van {grens:.0f}%)"
         # --- accu ---
         if self.bed.accu != "auto":
             actie = self.bed.accu
-            kw = self.cfg["accu"]["max_laden_kw"] if actie == "laden" else self.cfg["accu"]["max_ontladen_kw"]
-            await self.huis.accu(actie, kw, self.cfg["accu"]["max_soc"] if actie == "laden" else m.accu_soc)
-            b["accu"] = f"Handmatig: {actie}"
+            if actie == "zelfverbruik":
+                await self._eigen(m)
+            else:
+                kw = a["max_laden_kw"] if actie == "laden" else a["max_ontladen_kw"]
+                await self.huis.accu(actie, kw, a["max_soc"] if actie == "laden" else m.accu_soc)
+            b["accu"] = "Handmatig: " + {"laden": "laden", "ontladen": "leveren", "vasthouden": "vasthouden",
+                                         "zelfverbruik": "eigen verbruik"}.get(actie, actie)
+            reden = "Je hebt dit zelf gekozen bij Bediening. Kies daar Slim om het brein weer te laten beslissen."
         elif k and m.auto_kw > 1.0 and k.accu_actie != "laden" and m.zon_kw - m.huis_kw - m.wp_kw < m.auto_kw * 0.5 \
                 and not (k.accu_actie == "ontladen" and k.net_kwh < -0.02):
             # De auto laadt uit het net. De accu zou hem anders vanzelf meevoeden (de omvormer ziet alleen 'huis vraagt stroom').
@@ -250,21 +272,23 @@ class Brein:
             await self.huis.accu("vasthouden", 0, m.accu_soc)
             b["accu"] = ("Houdt lading vast: de auto laadt nu uit het net, niet uit de accu" if self.huis.kan_vasthouden
                          else "Voedt het huis (vasthouden kan bij dit merk nog niet, dus de accu helpt de auto mee)")
-        elif m.accu_soc >= float(self.cfg["accu"].get("max_soc", 100)) and self.huis.kan_vasthouden \
+            reden = "Wat in de accu zit, is straks meer waard dan de stroom waarmee de auto nu laadt."
+        elif m.accu_soc >= float(a.get("max_soc", 100)) and self.huis.kan_vasthouden \
                 and m.zon_kw - (m.huis_kw + m.wp_kw + m.auto_kw) > (0.0 if getattr(self, "_vol_vast", False) else 0.1) \
                 and not (k and k.accu_actie == "ontladen"):
             # De omvormer laadt in eigen verbruik door tot zijn eigen maximum (vaak 100%). Is de ingestelde bovengrens
             # bereikt en heeft de zon overschot, dan houden we de lading vast: de zon voedt het huis, de rest gaat naar het net.
             self._vol_vast = True
             await self.huis.accu("vasthouden", 0, m.accu_soc)
-            b["accu"] = f"Accu is op de ingestelde grens ({self.cfg['accu']['max_soc']:.0f}%): lading vastgehouden, zon voedt het huis"
+            b["accu"] = f"Accu is vol tot je grens van {a['max_soc']:.0f}%: lading vastgehouden"
+            reden = "De zon voedt het huis; wat over is, gaat naar het net."
         elif k:
             self._vol_vast = False
             vraag = k.huis_kwh + k.wp_kwh + k.auto_kwh - k.zon_kwh
             # Wat het plan voor dit kwartier wil laden, en wat de zon NU echt over heeft. Het plan rekent met de
             # zonvoorspelling; is het bewolkter dan verwacht, dan moet de rest uit het net komen, anders haalt de accu
             # zijn doel niet en mis je straks de dure uren.
-            plan_kw = max(k.accu_kwh, 0.0) / 0.25 / math.sqrt(float(self.cfg["accu"].get("rendement", 0.9)))
+            plan_kw = max(k.accu_kwh, 0.0) / 0.25 / math.sqrt(float(a.get("rendement", 0.9)))
             overschot_nu = m.zon_kw - (m.huis_kw + m.wp_kw + m.auto_kw)
             if k.accu_actie == "laden" and vraag < -0.02 and overschot_nu >= 0.8 * plan_kw:
                 await self._eigen(m)
@@ -272,60 +296,81 @@ class Brein:
             elif k.accu_actie == "laden" and vraag < -0.02 and self.prijzen.bron == "model":
                 await self._eigen(m)
                 b["accu"] = "Laadt met wat de zon over heeft (minder zon dan verwacht; geen echte prijzen om uit het net bij te laden)"
+                reden = ""
             elif k.accu_actie == "laden" and self.prijzen.bron == "model":
                 # Zonder echte stroomprijzen nooit uit het net laden: het plan rekent dan met een geschat patroon.
                 await self._eigen(m)
                 b["accu"] = "Laadt niet uit het net: er zijn nu geen echte stroomprijzen"
+                reden = ""
             elif k.accu_actie == "laden":
-                kw = min(plan_kw, self.cfg["accu"]["max_laden_kw"])
+                kw = min(plan_kw, a["max_laden_kw"])
                 await self.huis.accu("laden", kw, k.soc_na)
                 if vraag < -0.02:
                     b["accu"] = (f"Laadt {self._k(kw)} kW tot {k.soc_na:.0f}%: minder zon dan verwacht "
                                  f"({self._k(max(m.zon_kw, 0))} kW), de rest komt goedkoop uit het net")
                 else:
                     b["accu"] = f"Laadt uit het net ({self._k(kw)} kW) tot {k.soc_na:.0f}%"
+            elif k.accu_actie == "ontladen" and leeg:
+                await self._eigen(m)
+                b["accu"] = leeg_tekst
+                reden = "Het huis haalt de stroom nu van het net."
             elif k.accu_actie == "ontladen" and k.net_kwh < -0.02:
                 # Eerst het huis, dan pas terugleveren: wat het huis NU vraagt kost inkoopprijs, terugleveren levert
                 # alleen het (lagere) terugleverbedrag op. Het plan rekende met een verwacht verbruik; het echte
                 # verbruik van dit moment gaat voor.
                 plan_terug = max(-k.net_kwh / 0.25, 0.0)
                 vraag_nu = max(m.huis_kw + m.wp_kw + m.auto_kw - m.zon_kw, 0.0)
-                # Veiligheidsregel: alleen terugverkopen als dat niet goedkoper later weer ingekocht moet worden,
-                # of als de accu de komende 24 uur toch vol raakt (dan is de lading anders niets meer waard).
+                # Veiligheidsregel: alleen terugverkopen als dat meer oplevert dan later goedkoper weer inkopen, na laadverlies,
+                # slijtage en de minimale winst. Of als de accu de komende 24 uur toch vol raakt (dan is de lading anders niets waard).
                 komend = [x for x in self.plan["kwartieren"] if x.start + timedelta(minutes=15) > nu and x.start < nu + timedelta(hours=24)]
                 goedkoopst = min((x.inkoop for x in komend), default=inkoop)
-                raakt_vol = any(x.soc_na >= self.cfg["accu"]["max_soc"] - 2 for x in komend)
-                # rekening houden met laadverlies (heen en terug) en slijtage van de accu
-                rendement = float(self.cfg["accu"].get("rendement", 0.9))
-                slijtage = float(self.cfg["accu"].get("slijtage_per_kwh", 0.02))
-                if terug * rendement - slijtage < goedkoopst and not raakt_vol:
+                raakt_vol = any(x.soc_na >= a["max_soc"] - 2 for x in komend)
+                rendement = float(a.get("rendement", 0.9))
+                drempel = float(a.get("slijtage_per_kwh", 0.02)) + max(float(a.get("min_winst_per_kwh", 0.0) or 0.0), 0.0)
+                verkopen = mag_verkopen(a)
+                if not verkopen or (terug * rendement - drempel < goedkoopst and not raakt_vol):
                     plan_terug = 0.0
-                kw = min(self.cfg["accu"]["max_ontladen_kw"], vraag_nu + plan_terug)
+                kw = min(a["max_ontladen_kw"], vraag_nu + plan_terug)
                 kw = max(round(kw / 0.4) * 0.4, 0.4)            # in stapjes van 0,4 kW, zodat de omvormer niet elke 10 s een nieuwe opdracht krijgt
                 if plan_terug == 0.0:
                     await self._eigen(m)
-                    b["accu"] = (f"Voedt het huis; terugverkopen voor {self._e(terug)} levert na laadverlies en slijtage minder op "
-                                 f"dan later weer inkopen (vanaf {self._e(goedkoopst)})")
+                    b["accu"] = "Voedt het huis"
+                    reden = ("Terugverkopen aan het net staat uit; de accu voedt alleen je eigen huis." if not verkopen else
+                             f"Terugverkopen voor {self._e(terug)} levert na laadverlies en slijtage te weinig op tegenover later "
+                             f"weer inkopen (vanaf {self._e(goedkoopst)}).")
                 elif kw <= vraag_nu + 0.05:
                     await self._eigen(m)
-                    b["accu"] = f"Voedt het huis ({self._k(vraag_nu)} kW); het huis gaat voor terugleveren"
+                    b["accu"] = f"Voedt het huis ({self._k(vraag_nu)} kW)"
+                    reden = "Het huis gaat voor terugleveren: wat het huis nu vraagt, kost de inkoopprijs."
                 else:
                     await self.huis.accu("ontladen", kw)
-                    b["accu"] = f"Voedt het huis en levert {self._k(kw - vraag_nu)} kW terug (samen {self._k(kw)} kW)"
+                    b["accu"] = f"Verkoopt {self._k(kw - vraag_nu)} kW aan het net en voedt het huis (samen {self._k(kw)} kW)"
             elif k.accu_actie == "ontladen":
                 await self._eigen(m)
                 b["accu"] = "Voedt het huis"
             elif self._voeden(m, k, inkoop):
                 # Het huis vraagt nu stroom en die is duurder dan wat een opgeslagen kWh later oplevert: voeden.
                 await self._eigen(m)
-                b["accu"] = f"Voedt het huis op vraag: stroom nu {self._e(inkoop)}, een kWh in de accu is later {self._e(k.waarde_kwh)} waard"
+                b["accu"] = "Voedt het huis"
+                reden = f"Stroom kost nu {self._e(inkoop)}; een kWh in de accu is later {self._e(k.waarde_kwh)} waard."
             elif vraag > 0 or m.huis_kw + m.wp_kw + m.auto_kw > m.zon_kw:
                 await self.huis.accu("vasthouden", 0, m.accu_soc)
-                b["accu"] = (f"Houdt lading vast: later {self._e(k.waarde_kwh)} per kWh waard, nu {self._e(inkoop)}" if self.huis.kan_vasthouden
-                             else "Voedt het huis (lading vasthouden kan bij dit merk nog niet veilig)")
+                if leeg:
+                    b["accu"] = leeg_tekst
+                    reden = reden if "leeg" in reden else "Het huis haalt de stroom nu van het net."
+                elif self.huis.kan_vasthouden:
+                    b["accu"] = "Houdt lading vast voor een duurder moment"
+                    reden = f"Een kWh in de accu is straks {self._e(k.waarde_kwh)} waard; stroom kost nu {self._e(inkoop)}."
+                else:
+                    b["accu"] = "Voedt het huis (lading vasthouden kan bij dit merk nog niet veilig)"
+                    reden = ""
             else:
                 await self._eigen(m)
-                b["accu"] = "Zelfverbruik"
+                if overschot_nu > 0.1 and m.accu_soc < float(a.get("max_soc", 100)) - 0.5:
+                    b["accu"] = "Laadt met zonne-overschot"
+                    reden = "De zon levert meer dan het huis gebruikt; dat gaat de accu in in plaats van het net op."
+                else:
+                    b["accu"] = "Eigen verbruik"
         if self._p1_tekst and "accu" in b:
             b["accu"] += f" · {self._p1_tekst}"
         if "accu" in b and not self.huis.kan_accu_sturen:
@@ -351,7 +396,7 @@ class Brein:
             if sleutel in b and b[sleutel] and b[sleutel] not in ("Niet aangesloten",):
                 self.logboek.als_anders("besluit_" + sleutel, "besluit", f"{naam}: {b[sleutel]}", sleutel)
         self._volg_storingen()
-        b["reden"] = k.reden if k else ""
+        b["reden"] = reden
         b["inkoop"], b["teruglever"], b["beurs"] = inkoop, terug, beurs
         self.besluit = b
 
@@ -367,7 +412,7 @@ class Brein:
         """Moet de accu de vraag van dit moment dekken? Ja als een kWh uit de accu nu meer bespaart
         dan hij later in het plan oplevert, en er boven het minimum genoeg in zit."""
         vraag_nu = m.huis_kw + m.wp_kw + m.auto_kw - m.zon_kw
-        if vraag_nu <= 0.05 or m.accu_soc <= self.cfg["accu"]["min_soc"] + 1:
+        if vraag_nu <= 0.05 or m.accu_soc <= self.ondergrens() + 1:
             return False
         eta = math.sqrt(self.cfg["accu"]["rendement"])
         return inkoop * eta > k.waarde_kwh + 0.005
@@ -502,7 +547,7 @@ class Brein:
                         "actie": "Kijk in de GoodWe-app bij de batterij naar meldingen. Blijft het zo, neem dan contact op met je installateur of de leverancier van de accu."})
         st = getattr(omv, "stand", {}) or {}
         grens = st.get("ondergrens_pct")
-        if grens is not None and grens > self.cfg["accu"]["min_soc"] + 5:
+        if grens is not None and grens >= self.cfg["accu"]["min_soc"] + 2:
             uit.append({"ernst": "let op" if not (m and m.accu_soc <= grens + 1) else "fout", "apparaat": "omvormer",
                         "titel": f"De omvormer ontlaadt de accu niet verder dan {grens}%",
                         "uitleg": f"In de GoodWe staat de ontlaaddiepte (DoD) op {100 - grens}%, dus de accu stopt bij {grens}%. "
@@ -550,10 +595,31 @@ class Brein:
                         "uitleg": "De weersvoorspelling voor je panelen is niet bereikbaar; het brein gebruikt het maandgemiddelde.", "actie": ""})
         return uit
 
+    def waarde_lading(self) -> float:
+        """Wat een kWh die nu in de accu zit straks ongeveer waard is: de gemiddelde inkoopprijs van het komende etmaal,
+        min het verlies bij het ontladen. Hiermee telt lading die vandaag is ingekocht maar nog niet gebruikt eerlijk mee."""
+        prijzen = sorted(k.inkoop for k in self.plan["kwartieren"][:96])
+        if not prijzen:
+            return 0.0
+        return prijzen[len(prijzen) // 2] * math.sqrt(float(self.cfg["accu"].get("rendement", 0.9)))
+
+    def vandaag(self) -> dict:
+        v = self.gesch.vandaag()
+        m, cap = self.meting, float(self.cfg["accu"]["capaciteit_kwh"])
+        verschil = (m.accu_soc - v["soc_begin"]) / 100 * cap if (m and v.get("soc_begin") is not None) else 0.0
+        v["lading_kwh"] = round(verschil, 1)                       # zoveel meer (of minder) zit er nu in de accu dan vannacht
+        v["lading_eur"] = round(verschil * self.waarde_lading(), 2)
+        v["bespaard_accu"] = round(v["kosten_zonder_accu"] - v["kosten"] + v["lading_eur"], 2)
+        return v
+
     def status(self) -> dict:
         m = self.meting
         return {"meting": m.dict() if m else None, "besluit": self.besluit, "bediening": self.bed.dict(),
-                "vandaag": self.gesch.vandaag(), "voorspelling": self.voorsp.status(),
+                "vandaag": self.vandaag(), "voorspelling": self.voorsp.status(),
+                "accu_instelling": {"min": self.ondergrens(), "max": float(self.cfg["accu"].get("max_soc", 100)),
+                                    "min_ingesteld": float(self.cfg["accu"]["min_soc"]), "min_omvormer": self._omvormer_grens(),
+                                    "terugverkopen": mag_verkopen(self.cfg["accu"]),
+                                    "min_winst": float(self.cfg["accu"].get("min_winst_per_kwh", 0.0) or 0.0)},
                 "prijsbron": self.prijzen.bron, "simulatie": bool(self.huis.sim),
                 "apparaten": self.huis.onderdelen(), "fouten": self.huis.fouten, "meldingen": self.huis.meldingen,
                 "storingen": self.storingen(), "tibber": {"actief": bool(self.prijzen.tibber), "fout": self.prijzen.tibber_fout},

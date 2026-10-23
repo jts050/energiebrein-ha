@@ -56,6 +56,15 @@ class Voorspelling:
         self.leerdagen = 0
         self.bewaard_zon: dict[str, float] = {}    # kwartier-start (iso) → voorspelde kWh, om van te leren
         data = data_map(cfg)
+        # wat het brein over je dak leerde, bewaard: anders begint het na elke herstart (bijv. instellingen opslaan) opnieuw
+        self._zon_pad = data / "zon.json"
+        try:
+            import json
+            z = json.loads(self._zon_pad.read_text())
+            self.zon_correctie = max(0.6, min(1.4, float(z.get("correctie", 1.0))))
+            self.bewaard_zon = {k: float(v) for k, v in (z.get("voorspeld") or {}).items()}
+        except Exception:
+            pass
         self.weer = Weer(cfg)
         self.ai_huis = HuisAI(data / "ai_huis.pkl", "huis_kwh", "huis")
         self.ai_wp = HuisAI(data / "ai_warmtepomp.pkl", "wp_kwh", "warmtepomp")
@@ -150,6 +159,13 @@ class Voorspelling:
         if voorspeld > 2.0:
             nieuw = max(0.6, min(1.4, gemeten / voorspeld * self.zon_correctie))
             self.zon_correctie = 0.7 * self.zon_correctie + 0.3 * nieuw
+        try:
+            import json
+            grens = (nu - timedelta(days=10)).isoformat()
+            self._zon_pad.write_text(json.dumps({"correctie": round(self.zon_correctie, 4),
+                                                 "voorspeld": {k: round(v, 4) for k, v in self.bewaard_zon.items() if k >= grens}}))
+        except Exception as e:
+            log.warning("Zoncorrectie bewaren mislukt: %s", e)
         log.info("Geleerd van %d dagen", self.leerdagen)
 
     def bereid(self, tijden: list[datetime]) -> None:
