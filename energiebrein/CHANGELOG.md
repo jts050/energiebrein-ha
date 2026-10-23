@@ -1,5 +1,10 @@
 # Wat er nieuw is
 
+## 1.6.9
+
+- Klemmenproef: gaat er tijdens stap 1 een apparaat aan of uit (warmtepomp, oven), dan doet hij die stap vanzelf opnieuw in plaats van een onbetrouwbare uitslag te geven.
+- Duidelijkere aanwijzing als een klem op de verkeerde fase zit: verplaats de klemmen terwijl een apparaat blijft draaien en kijk in de tabel tot de omvormer hetzelfde ziet als de slimme meter.
+
 ## 1.6.8
 
 - **Knop "Klemmen controleren"** bij Koppelen → Omvormer en thuisaccu → Meting en regeling. Een proef van een paar minuten: de accu levert even 2,4 kW (gelijk over de drie fasen), daarna zet je de waterkoker aan (één fase). Energiebrein vergelijkt per fase wat de omvormer en je slimme meter zien, en zegt per klem of hij klopt, andersom zit of op de verkeerde fase zit.

@@ -41,7 +41,7 @@ UITLEG = {
     "goed": "klopt",
     "andersom": "zit andersom (draai de klem om)",
     "fase": "zit op de verkeerde fase: de omvormer ziet maar ongeveer de helft",
-    "niets": "meet bijna niets: zit de klem om de kabel en goed dicht?",
+    "niets": "meet bijna niets (zit de klem om de kabel en goed dicht?)",
     "onduidelijk": "geeft een vreemde waarde",
 }
 
@@ -61,6 +61,7 @@ class KlemTest:
         self.regels: list[str] = []
         self.goed = None
         self.tekst = ""
+        self.pogingen = 0
 
     @property
     def bezig(self) -> bool:
@@ -119,8 +120,12 @@ class KlemTest:
             if dt > 15 and meet:
                 self.rijen.append((list(p1), list(ct), m.accu_kw))
             if len(self.rijen) >= 4:
-                self._uitslag_accu(_gem(self.rijen, 0), _gem(self.rijen, 1), sum(r[2] for r in self.rijen) / len(self.rijen))
-                self._naar("rust2", "Even wachten tot de accu weer stil staat…")
+                self.pogingen += 1
+                if not self._uitslag_accu(_gem(self.rijen, 0), _gem(self.rijen, 1), sum(r[2] for r in self.rijen) / len(self.rijen)) \
+                        and self.pogingen < 3:
+                    self._naar("rust", "Stap 1 opnieuw: tijdens de meting ging een apparaat aan of uit. Laat grote apparaten even met rust.")
+                else:
+                    self._naar("rust2", "Even wachten tot de accu weer stil staat…")
             elif dt > 90:
                 self.regels.append("De accu reageerde niet op de opdracht om te leveren; stap 1 is overgeslagen.")
                 self._naar("rust2", "Even wachten tot de accu weer stil staat…")
@@ -144,16 +149,23 @@ class KlemTest:
                 self._klaar()
         return "CT-klemmen controleren: " + self.tekst
 
-    def _uitslag_accu(self, p1, ct, accu_kw):
+    def _uitslag_accu(self, p1, ct, accu_kw) -> bool:
+        """Beoordeel stap 1. Geeft False als de meting verstoord was (een apparaat ging aan of uit): dan nog een keer."""
         dp = [p1[f] - self.basis[0][f] for f in range(3)]
         dc = [ct[f] - self.basis[1][f] for f in range(3)]
         da = accu_kw - self.basis_accu
         if abs(da) < 1.0:
             self.regels.append(f"Stap 1: de accu veranderde maar {_k(abs(da))} kW; te weinig om de klemmen te beoordelen.")
-            return
-        if abs(sum(dp) - da) > 0.7:
-            self.regels.append("Stap 1: tijdens de meting veranderde ook het verbruik in huis (een apparaat ging aan of uit). "
-                               "De uitslag van deze stap is daardoor onzeker; doe de proef liever opnieuw met minder apparaten aan.")
+            return True
+        # Gelijk verdeeld over de fasen en samen gelijk aan wat de accu deed? Anders ging er in huis iets aan of uit.
+        gem = sum(dp) / 3
+        if abs(sum(dp) - da) > 0.7 or max(abs(x - gem) for x in dp) > 0.4:
+            if self.pogingen < 3:
+                return False
+            self.regels.append("Stap 1: tijdens de meting ging steeds een apparaat aan of uit (bijvoorbeeld de warmtepomp of oven). "
+                               "Deze stap is daarom niet beoordeeld; stap 2 met de waterkoker zegt het meeste.")
+            self._stap1 = []
+            return True
         oordeel = []
         for f in range(3):
             if abs(dp[f]) < 0.3:
@@ -163,6 +175,7 @@ class KlemTest:
             oordeel.append(soort)
             self.regels.append(f"Stap 1, L{f + 1}: slimme meter {_k(dp[f])} kW, omvormer {_k(dc[f])} kW: {UITLEG[soort]}.")
         self._stap1 = oordeel
+        return True
 
     def _uitslag_koker(self, p1, ct):
         dp = [p1[f] - self.basis2[0][f] for f in range(3)]
@@ -183,7 +196,8 @@ class KlemTest:
         elif soort == "fase":
             self.regels.append(f"Stap 2: de waterkoker ({_k(P)} kW) zit op L{fase + 1}, maar de omvormer ziet op ingang L{kanaal + 1} "
                                f"maar {_k(dc[kanaal])} kW. De klem om de kabel van L{fase + 1} hoort bij een andere fase-ingang "
-                               "van de omvormer. Wissel de klemmen tot de omvormer de waterkoker even groot ziet.")
+                               "van de omvormer. Zet een apparaat aan dat lang blijft draaien (föhn, kachel) en verplaats de "
+                               "klemmen tot de omvormer het in de tabel hierboven even groot ziet als de slimme meter.")
         else:
             self.regels.append(f"Stap 2: de waterkoker ({_k(P)} kW) zit op L{fase + 1}, maar de omvormer ziet hem nergens goed. "
                                f"Zit de klem van die fase om de kabel en goed dicht?")
