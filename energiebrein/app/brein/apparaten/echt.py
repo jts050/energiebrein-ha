@@ -138,6 +138,7 @@ class GoodWe:
         fout = d.get("battery_error") or d.get("battery_warning")
         _a = lambda v: None if v is None else abs(v - 65536 if isinstance(v, int) and v > 32767 else v)
         self.bms = {"ontladen_a": _a(d.get("battery_discharge_limit")), "laden_a": d.get("battery_charge_limit"),
+                    "spanning": d.get("vbattery1"),
                     "temperatuur": d.get("battery_temperature"), "stand": d.get("battery_mode_label"),
                     "fout": fout if fout not in (0, "0", "") else None}
         await self._controleer_stand()

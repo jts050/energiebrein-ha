@@ -1,5 +1,10 @@
 # Wat er nieuw is
 
+## 1.6.2
+
+- Bij terugverkopen toont Thuis wat er echt gebeurt (gemeten), niet wat er gevraagd is.
+- Levert de accu minder dan gevraagd omdat de accu zelf (de BMS) niet meer toestaat, dan zegt het brein dat, en welk ontlaadvermogen je het beste instelt zodat het plan klopt.
+
 ## 1.6.1
 
 - De melding "De meter van de GoodWe ziet iets anders dan je slimme meter" komt pas als het verschil een paar minuten blijft. Eén meting, bijvoorbeeld net als de waterkoker aangaat, gaf een vals alarm: de slimme meter meet elke seconde, de omvormer loopt een paar seconden achter.

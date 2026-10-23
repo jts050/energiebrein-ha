@@ -347,7 +347,17 @@ class Brein:
                     reden = "Het huis gaat voor terugleveren: wat het huis nu vraagt, kost de inkoopprijs."
                 else:
                     await self.huis.accu("ontladen", kw)
-                    b["accu"] = f"Verkoopt {self._k(kw - vraag_nu)} kW aan het net en voedt het huis (samen {self._k(kw)} kW)"
+                    if m.accu_kw < -0.3:
+                        # wat er echt gebeurt, niet wat er gevraagd is: de accu kan minder leveren dan het vermogen van de omvormer
+                        b["accu"] = f"Verkoopt {self._k(max(-m.net_kw, 0.0))} kW aan het net en voedt het huis"
+                        grens_kw = self._accu_grens_kw()
+                        if -m.accu_kw < 0.85 * kw and grens_kw and -m.accu_kw >= 0.9 * grens_kw:
+                            pct = int(grens_kw / float(self.cfg["omvormer"].get("vermogen_kw") or kw) * 100 // 5 * 5)
+                            reden = (reden + " " if reden else "") + (
+                                f"De accu levert {self._k(-m.accu_kw)} kW: meer laat de accu zelf nu niet toe. "
+                                f"Zet bij Koppelen het ontlaadvermogen op {pct}%, dan rekent het plan daarmee.")
+                    else:
+                        b["accu"] = f"Gaat {self._k(kw)} kW leveren: aan het huis en {self._k(kw - vraag_nu)} kW aan het net"
             elif k.accu_actie == "ontladen":
                 await self._eigen(m)
                 b["accu"] = "Voedt het huis"
@@ -409,6 +419,15 @@ class Brein:
         b["reden"] = reden
         b["inkoop"], b["teruglever"], b["beurs"] = inkoop, terug, beurs
         self.besluit = b
+
+    def _accu_grens_kw(self) -> float | None:
+        """Hoeveel de accu zelf (de BMS) nu maximaal mag leveren: toegestane stroom × accuspanning, als de omvormer dat meldt."""
+        bms = getattr(self.huis.omvormer, "bms", None) or {}
+        try:
+            a, v = float(bms.get("ontladen_a") or 0), float(bms.get("spanning") or 0)
+        except (TypeError, ValueError):
+            return None
+        return a * v / 1000 if a > 0 and v > 20 else None
 
     def _vergelijk_meters(self, m: Meting, nu: datetime) -> None:
         """Bijhouden of de CT-meter van de omvormer en de slimme meter hetzelfde zien. Eén meting zegt niets: de slimme meter
