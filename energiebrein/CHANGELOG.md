@@ -1,5 +1,12 @@
 # Wat er nieuw is
 
+## 1.6.4
+
+- P1-regeling rustiger en fijner: stapjes van 0,1 kW in plaats van 0,4 kW. Hij komt nu ook op 0 kW uit als de omvormer veel meer laadt dan gevraagd.
+- Laadt de omvormer bij de kleinste opdracht al meer dan de zon over heeft, dan wacht de accu. Een beetje terugleveren is goedkoper dan laden uit het net.
+- De uitleg bij "Laadt met zonne-overschot" zegt wat er echt gebeurt, bijvoorbeeld hoeveel er nog uit het net komt.
+- De melding "De meter van de GoodWe ziet iets anders" vergelijkt nu per fase. Zo zie je welke CT-klem niet klopt (andersom, niet om de kabel of op de verkeerde fase).
+
 ## 1.6.3
 
 - P1-regeling opnieuw gebouwd: hij stelt het opdrachtvermogen stap voor stap bij tot de slimme meter op 0 kW staat. Dat werkt ook als de omvormer het opgegeven vermogen anders telt dan gedacht. Zonne-overschot gaat zo de accu in, zonder stroom uit het net.

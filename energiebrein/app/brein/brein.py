@@ -214,22 +214,44 @@ class Brein:
         if self.cfg["omvormer"].get("regel", "omvormer") != "p1" or not self.huis.p1 or not self.huis.kan_accu_sturen:
             await self.huis.accu("zelfverbruik")
             return
-        # Integrerende regeling: het vorige opdrachtvermogen wordt bijgesteld met wat de P1 nog afwijkt van 0. Zo komt de P1 op 0
-        # uit, ook als de omvormer het opgegeven vermogen anders telt (bijvoorbeeld bovenop wat de zon al in de accu stopt).
+        # Integrerende regeling: de vorige opdracht wordt rustig bijgesteld met wat de P1 nog afwijkt van 0. Zo komt de P1 op 0
+        # uit, ook als de omvormer het opgegeven vermogen anders telt dan gedacht (bijvoorbeeld 3x zoveel laadt als gevraagd).
+        # Kleine stapjes (0,1 kW) en een lage versterking, anders schiet hij door: van laden uit het net naar terugleveren en terug.
         nu = time.monotonic()
         if getattr(self, "_p1_vorige", None) is None or nu - getattr(self, "_p1_tijd", 0.0) > 90:
             self._p1_vorige = m.accu_kw                         # start vanaf wat de accu nu echt doet
+            self._p1_gezet = 0.0
         self._p1_tijd = nu
-        gewenst = self._p1_vorige - 0.7 * m.net_kw              # net > 0 (afname): minder laden / meer ontladen
-        if abs(m.net_kw) < 0.1:
-            gewenst = self._p1_vorige                           # dicht genoeg bij 0: niet bijstellen
+        gewenst = self._p1_vorige
+        snel = abs(m.net_kw) > 1.5                              # groot verschil (waterkoker, wolk weg): meteen bijsturen
+        drempel = 0.08 if (m.net_kw > 0 and self._p1_vorige > 0) else 0.2   # laden uit het net: eerder ingrijpen
+        if abs(m.net_kw) >= drempel and (snel or nu - self._p1_gezet >= 20):
+            gewenst = self._p1_vorige - (0.6 if snel else 0.35) * m.net_kw     # afname: minder laden / meer leveren
+        # Laadt de omvormer bij de kleinste opdracht al meer dan er over is, dan haalt hij de rest uit het net. Dat leert de
+        # regeling: is het overschot kleiner dan wat de omvormer minimaal laadt, dan rust de accu (een beetje terugleveren is
+        # goedkoper dan laden uit het net).
+        vorige_kw = getattr(self, "_p1_kw", 0.0)
+        if 0 < vorige_kw <= 0.1 and nu - self._p1_gezet >= 20 and m.accu_kw > vorige_kw + 0.15:
+            self._p1_min_laden, self._p1_min_tijd = m.accu_kw, nu
+        if nu - getattr(self, "_p1_min_tijd", -1e9) > 900:
+            self._p1_min_laden = None                           # na een kwartier opnieuw proberen
+        nodig = m.accu_kw - m.net_kw                            # zoveel moet de accu doen om het net op 0 te krijgen
+        min_laden = getattr(self, "_p1_min_laden", None)
+        if gewenst > 0 and min_laden and nodig < min_laden * 0.95:
+            gewenst = 0.0
         if m.accu_soc >= float(a.get("max_soc", 100)) and gewenst > 0:
             gewenst = 0.0
         if m.accu_soc <= self.ondergrens() + 0.5 and gewenst < 0:
             gewenst = 0.0
         gewenst = max(-a["max_ontladen_kw"], min(a["max_laden_kw"], gewenst))
-        kw = round(gewenst / 0.4) * 0.4                     # stapjes van 0,4 kW: niet elke paar seconden een nieuwe opdracht
+        if gewenst != self._p1_vorige:
+            self._p1_gezet = nu
         self._p1_vorige = gewenst
+        kw = round(gewenst, 1)
+        if abs(kw) < 0.1:
+            kw = 0.0
+        self._p1_kw = kw
+        log.debug("P1-regeling: net %.2f kW, accu %.2f kW, opdracht %.1f kW", m.net_kw, m.accu_kw, kw)
         self._p1_tekst = (f"P1-regeling: laadt {kw:.1f} kW".replace(".", ",") if kw > 0.01 else
                           f"P1-regeling: levert {-kw:.1f} kW".replace(".", ",") if kw < -0.01 else "P1-regeling: accu rust")
         if kw > 0.01:
@@ -303,6 +325,7 @@ class Brein:
             if k.accu_actie == "laden" and vraag < -0.02 and overschot_nu >= 0.8 * plan_kw:
                 await self._eigen(m)
                 b["accu"] = "Laadt met zonne-overschot"
+                reden = self._zon_reden(m) or reden
             elif k.accu_actie == "laden" and vraag < -0.02 and self.prijzen.bron == "model":
                 await self._eigen(m)
                 b["accu"] = "Laadt met wat de zon over heeft (minder zon dan verwacht; geen echte prijzen om uit het net bij te laden)"
@@ -395,7 +418,7 @@ class Brein:
                 await self._eigen(m)
                 if overschot_nu > 0.1 and m.accu_soc < float(a.get("max_soc", 100)) - 0.5:
                     b["accu"] = "Laadt met zonne-overschot"
-                    reden = "De zon levert meer dan het huis gebruikt; dat gaat de accu in in plaats van het net op."
+                    reden = self._zon_reden(m) or "De zon levert meer dan het huis gebruikt; dat gaat de accu in in plaats van het net op."
                 else:
                     b["accu"] = "Eigen verbruik"
         if self._p1_tekst and "accu" in b:
@@ -448,7 +471,7 @@ class Brein:
             reeks.clear()
             return
         if m.net_kw > 0.8 or mk > 0.8:           # alleen als er echt iets van het net komt; bij weinig verbruik zegt het verschil weinig
-            reeks.append((nu, m.net_kw, mk))
+            reeks.append((nu, m.net_kw, mk, getattr(self.huis.p1, "fasen", None), getattr(self.huis.omvormer, "meter_fasen", None)))
 
     def _meters_wijken_af(self) -> tuple[float, float] | None:
         """Wijken de meters al minstens twee minuten (aan metingen) meestal meer dan 1 kW af? Dan de gemiddelden, anders None."""
@@ -460,6 +483,28 @@ class Brein:
             return None
         return sum(r[1] for r in af) / len(af), sum(r[2] for r in af) / len(af)
 
+    def _fase_tekst(self) -> str:
+        """Per fase vergelijken: zo zie je welke CT-klem niet klopt. Een klem die andersom zit, meet hetzelfde maar met het
+        omgekeerde teken; een klem die niet om de kabel zit, meet niets."""
+        rijen = [r for r in self._meter_reeks if len(r) > 4 and r[3] and r[4]]
+        if len(rijen) < 6:
+            return ""
+        p1 = [sum(r[3][i] for r in rijen) / len(rijen) for i in range(3)]
+        ct = [sum(r[4][i] for r in rijen) / len(rijen) for i in range(3)]
+        delen, tips = [], []
+        for i in range(3):
+            delen.append(f"L{i + 1}: slimme meter {self._k(p1[i])}, GoodWe {self._k(ct[i])}")
+            if abs(p1[i]) > 0.2 and abs(ct[i] + p1[i]) < 0.35 * abs(p1[i]) and abs(ct[i] - p1[i]) > 0.4:
+                tips.append(f"de klem op L{i + 1} zit waarschijnlijk andersom (zelfde waarde, omgekeerd teken)")
+            elif abs(p1[i]) > 0.3 and abs(ct[i]) < 0.05:
+                tips.append(f"de klem op L{i + 1} meet niets: zit hij om de kabel?")
+            elif abs(ct[i] - p1[i]) > 0.4:
+                tips.append(f"L{i + 1} wijkt af: zit die klem op de goede fase?")
+        tekst = " Per fase (kW, + = afname): " + "; ".join(delen) + "."
+        if tips:
+            tekst += " Mogelijke oorzaak: " + "; ".join(tips) + ". (De fasenummers van de omvormer kunnen anders zijn dan die van de meter.)"
+        return tekst
+
     @staticmethod
     def _k(x: float) -> str:
         return f"{x:.1f}".replace(".", ",")
@@ -467,6 +512,25 @@ class Brein:
     @staticmethod
     def _e(x: float) -> str:
         return f"€ {x:.2f}".replace(".", ",")
+
+    def _zon_reden(self, m: Meting) -> str | None:
+        """Bij laden met zonne-overschot: zeg wat er echt gebeurt als dat afwijkt van de bedoeling."""
+        min_laden = getattr(self, "_p1_min_laden", None)
+        if m.accu_kw > 0.1 and m.net_kw > 0.15:
+            return (f"De accu laadt {self._kw(m.accu_kw)}, waarvan {self._kw(m.net_kw)} nu uit het net komt. "
+                    "De regeling stuurt bij tot alleen de zon de accu laadt.")
+        if m.accu_kw < 0.1 and m.net_kw < -0.1 and min_laden:
+            return (f"De omvormer laadt minimaal {self._kw(min_laden)}; de zon heeft maar {self._kw(-m.net_kw)} over. "
+                    "Dan zou de rest uit het net komen, dus de accu wacht tot er meer zon is.")
+        if m.accu_kw < 0.1 and m.net_kw < -0.1:
+            return (f"Er gaat {self._kw(-m.net_kw)} naar het net; de accu laadt nog niet. "
+                    + ("De regeling stuurt bij." if self._p1_tekst else
+                       "Ziet de CT-meter van de omvormer iets anders dan je slimme meter? Zet dan de P1-regeling aan."))
+        return None
+
+    @staticmethod
+    def _kw(x: float) -> str:
+        return f"{x:.1f} kW".replace(".", ",")
 
     def _voeden(self, m: Meting, k: Kwartier, inkoop: float) -> bool:
         """Moet de accu de vraag van dit moment dekken? Ja als een kWh uit de accu nu meer bespaart
@@ -622,7 +686,7 @@ class Brein:
             uit.append({"ernst": "let op", "apparaat": "omvormer", "titel": "De meter van de GoodWe ziet iets anders dan je slimme meter",
                         "uitleg": f"De afgelopen minuten mat je slimme meter gemiddeld {self._k(p1)} kW van het net, de CT-meter van de GoodWe "
                                   f"{self._k(ct)} kW. De accu voedt alleen wat zijn eigen meter ziet. Zit die meter niet op de hoofdaansluiting "
-                                  "(alle fasen), dan blijft de accu stil terwijl je huis van het net haalt.",
+                                  "(alle fasen), dan blijft de accu stil terwijl je huis van het net haalt." + self._fase_tekst(),
                         "actie": "Laat controleren of de CT-klemmen van de GoodWe om de hoofdkabels in de meterkast zitten, op alle drie de fasen en in de goede richting."})
         afw = getattr(self.huis.omvormer, "afwijking", None)
         if afw:

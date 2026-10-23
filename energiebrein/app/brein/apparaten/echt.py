@@ -135,6 +135,8 @@ class GoodWe:
         if meter is None:
             meter = d.get("active_power")
         self.meter_kw = None if meter is None else -float(meter) / 1000     # + = afname van het net, zoals de GoodWe-meter het ziet
+        f = [d.get(f"meter_active_power{i}") for i in (1, 2, 3)]
+        self.meter_fasen = [-float(v) / 1000 for v in f] if all(v is not None for v in f) else None
         fout = d.get("battery_error") or d.get("battery_warning")
         _a = lambda v: None if v is None else abs(v - 65536 if isinstance(v, int) and v > 32767 else v)
         self.bms = {"ontladen_a": _a(d.get("battery_discharge_limit")), "laden_a": d.get("battery_charge_limit"),
@@ -341,6 +343,8 @@ class HomeWizardP1:
             if r.status == 403:
                 raise PermissionError("De lokale API van de HomeWizard staat uit. Zet hem aan in de HomeWizard-app: Instellingen → Meters → je meter → Lokale API.")
             d = await r.json(content_type=None)
+        f = [d.get(f"active_power_l{i}_w") for i in (1, 2, 3)]
+        self.fasen = [v / 1000 for v in f] if all(v is not None for v in f) else None     # + = afname, per fase
         return {"net_kw": d["active_power_w"] / 1000}
 
 
