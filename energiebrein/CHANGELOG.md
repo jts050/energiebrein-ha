@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.6.8
+
+- **Knop "Klemmen controleren"** bij Koppelen → Omvormer en thuisaccu → Meting en regeling. Een proef van een paar minuten: de accu levert even 2,4 kW (gelijk over de drie fasen), daarna zet je de waterkoker aan (één fase). Energiebrein vergelijkt per fase wat de omvormer en je slimme meter zien, en zegt per klem of hij klopt, andersom zit of op de verkeerde fase zit.
+
 ## 1.6.7
 
 - **CT-klemmen testen, per fase.** Bij Koppelen → Meting en regeling zie je live per fase wat je slimme meter en de omvormer meten. Zo zie je meteen welke klem op de verkeerde fase zit of andersom.

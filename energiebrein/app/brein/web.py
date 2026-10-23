@@ -278,6 +278,21 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
             st["tekst"] = f"De licentieserver is niet bereikbaar ({lic.fout}). De code is bewaard; het kastje probeert het later opnieuw."
         return st
 
+    @app.get("/api/klemtest")
+    async def klemtest_stand():
+        return B().klemtest.dict()
+
+    @app.post("/api/klemtest")
+    async def klemtest(d: dict):
+        if d.get("stop"):
+            return B().klemtest.stop()
+        if B().huis.vergrendeld:
+            raise HTTPException(403, "De accu aansturen voor de proef hoort bij Plus.")
+        try:
+            return B().klemtest.start()
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
     @app.post("/api/omvormer/ondergrens")
     async def ondergrens(d: dict):
         omv = B().huis.omvormer

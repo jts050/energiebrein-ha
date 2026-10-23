@@ -32,6 +32,8 @@ class Brein:
         self.licentie = Licentie(cfg)
         from .logboek import Logboek
         self.logboek = Logboek(data_map(cfg) / "logboek.db")
+        from .klemtest import KlemTest
+        self.klemtest = KlemTest(self)
         self.huis.logboek = self.logboek
         self._storingen_vorig: dict | None = None
         from .telefoon import Telefoon
@@ -287,7 +289,11 @@ class Brein:
         leeg = m.accu_soc <= grens + 0.5
         leeg_tekst = f"Accu is leeg (op de ondergrens van {grens:.0f}%)"
         # --- accu ---
-        if self.bed.accu != "auto":
+        if self.klemtest.bezig:
+            # Proef met de CT-klemmen: de proef bepaalt even wat de accu doet.
+            b["accu"] = await self.klemtest.ronde(m)
+            reden = "Na de proef gaat alles weer vanzelf verder zoals gepland."
+        elif self.bed.accu != "auto":
             actie = self.bed.accu
             if actie == "zelfverbruik":
                 await self._eigen(m)
@@ -621,7 +627,8 @@ class Brein:
                 await self.regel()
             except Exception:
                 log.exception("Regelen mislukt")
-            await asyncio.sleep(self.cfg["regelaar"]["interval_s"])
+            # tijdens de klemmenproef vaker meten
+            await asyncio.sleep(3 if self.klemtest.bezig else self.cfg["regelaar"]["interval_s"])
 
     async def _plan_lus(self):
         while True:
@@ -765,6 +772,7 @@ class Brein:
                                     "min_ingesteld": float(self.cfg["accu"]["min_soc"]), "min_omvormer": self._omvormer_grens(),
                                     "terugverkopen": mag_verkopen(self.cfg["accu"]),
                                     "min_winst": float(self.cfg["accu"].get("min_winst_per_kwh", 0.0) or 0.0)},
+                "klemtest": self.klemtest.dict(),
                 "fasen": {"p1": getattr(self.huis.p1, "fasen", None), "omvormer": getattr(self.huis.omvormer, "meter_fasen", None)},
                 "prijsbron": self.prijzen.bron, "simulatie": bool(self.huis.sim),
                 "apparaten": self.huis.onderdelen(), "fouten": self.huis.fouten, "meldingen": self.huis.meldingen,

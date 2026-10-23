@@ -604,6 +604,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 /* koppelen: geavanceerde meting en regeling */
 .extra.meet{margin-top:10px;border-top:1px solid var(--hair);padding-top:12px}
 .fasetest table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin:4px 0}.fasetest th,.fasetest td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--hair)}.fasetest th:first-child,.fasetest td:first-child{text-align:left}.fasetest tr.af td{color:var(--bad)}.fase-kop{margin:16px 0 4px;font-size:14px}
+.klemtest-uit{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:8px 0;font-size:14px}.klemtest-uit.goed{border-color:var(--good)}.klemtest-uit.fout{border-color:var(--bad)}.klemtest-uit,.klemtest-uit li,.klemtest-uit b{color:var(--ink)}.klemtest-uit ul{margin:6px 0 0;padding-left:18px}.klemtest-uit li{margin:3px 0}
 </style>
 </head>
 <body>
@@ -798,7 +799,9 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
           <p class="note">Aanvinken als je ook andere zonne-omvormers hebt die de app niet uitleest: dan rekent Energiebrein het huisverbruik en de totale zon vanaf die meter.</p>
           <h4 class="fase-kop">CT-klemmen testen, per fase</h4>
           <div id="k-fasen" class="fasetest"></div>
-          <p class="note">Zet één apparaat aan dat op één fase zit, zoals de waterkoker. Dat vermogen hoort bij de slimme meter én bij de omvormer op dezelfde fase te verschijnen, ongeveer even groot. Ziet de omvormer het op een andere fase of maar half zo groot, dan zit die klem op de verkeerde fase (of de spanningsdraad van die fase). Zelfde getal met het omgekeerde teken: klem andersom. De getallen verversen vanzelf.</p>
+          <div class="row"><button class="btn vol" type="button" id="k-klemtest">Klemmen controleren</button></div>
+          <div id="k-klemtest-uit" class="klemtest-uit" hidden></div>
+          <p class="note">De proef duurt een paar minuten. Eerst levert de accu even 2,4 kW, daarna vraagt Energiebrein je de waterkoker aan te zetten. Bij elke stap moet de omvormer hetzelfde zien als je slimme meter. Half zo groot betekent dat de klem op de verkeerde fase zit, het omgekeerde teken dat hij andersom zit. Laat de oven en andere grote apparaten tijdens de proef uit.</p>
         </details>
 
         </div>
@@ -1077,8 +1080,20 @@ function renderFasen(){
   el.innerHTML='<table><tr><th></th><th>Slimme meter</th><th>Omvormer</th><th>Verschil</th></tr>'+[0,1,2].map(i=>{const p=f.p1[i],o=f.omvormer[i],d=o-p;
     return `<tr class="${Math.abs(d)>0.3?'af':''}"><td>L${i+1}</td><td>${nf(p,2)} kW</td><td>${nf(o,2)} kW</td><td>${(d>0?'+':'')+nf(d,2)} kW</td></tr>`;}).join('')+'</table><p class="note">+ is afname van het net, − is terugleveren.</p>';
 }
+let KT=null;
+function renderKlemtest(t){const el=$('k-klemtest-uit'),kn=$('k-klemtest');if(!el)return;KT=t;
+  if(!t||(!t.bezig&&!t.klaar&&!t.tekst)){el.hidden=true;kn.textContent='Klemmen controleren';return;}
+  el.hidden=false;kn.textContent=t.bezig?'Proef stoppen':'Opnieuw controleren';
+  el.className='klemtest-uit'+(t.klaar?(t.goed?' goed':' fout'):'');
+  el.innerHTML=`<p><b>${esc(t.tekst||'')}</b></p>`+((t.regels||[]).length?'<ul>'+t.regels.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'');
+  if(t.bezig)setTimeout(async()=>{try{renderKlemtest(await api('/api/klemtest'));}catch(e){}},2000);
+}
+document.addEventListener('click',async e=>{if(e.target.id!=='k-klemtest')return;
+  try{renderKlemtest(await api('/api/klemtest',KT&&KT.bezig?{stop:true}:{}));}
+  catch(err){renderKlemtest({tekst:err.message,regels:[]});}
+});
 function renderStatus(){
-  renderFasen();
+  renderFasen();if(S.klemtest&&(S.klemtest.bezig||S.klemtest.klaar)&&!(KT&&(KT.bezig||KT.klaar)))renderKlemtest(S.klemtest);
   const m=S.meting,b=S.besluit||{},a=S.apparaten||{},v=S.voorspelling||{},ai=v.ai_huis||{};
   const st=(S.storingen||[]).filter(x=>x.ernst!=='info'), storing=st.length;
   $('railvoet').innerHTML=`<span><i class="stip ${S.simulatie?'warn':''}"></i>${S.simulatie?'Simulatie':'Je eigen huis'}</span>
