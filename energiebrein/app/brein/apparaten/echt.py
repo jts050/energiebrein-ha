@@ -5,7 +5,7 @@ naar intern geheugen, en dat moet je niet elke 10 seconden doen."""
 from __future__ import annotations
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import aiohttp
 
@@ -160,10 +160,21 @@ class GoodWe:
         doel = EMSMode.BATTERY_STANDBY if aan else EMSMode.AUTO
         try:
             await asyncio.wait_for(self.inv.set_ems_mode(doel), timeout=15)
-            nu = await asyncio.wait_for(self.inv.get_ems_mode(), timeout=15)
         except Exception as e:
             log.warning("GoodWe EMS-modus %s lukt niet: %s", doel.name, e)
-            return False
+        # Nakijken. De omvormer neemt een nieuwe stand soms pas na een paar seconden over; daarom een paar keer kijken.
+        # Vroeger gaf één te vroege controle "lukt niet", terwijl de omvormer wél in stand-by ging en daar bleef hangen.
+        nu = None
+        for poging in range(3):
+            try:
+                nu = await asyncio.wait_for(self.inv.get_ems_mode(), timeout=15)
+            except Exception:
+                nu = None
+            if nu == doel:
+                break
+            await asyncio.sleep(3)
+        if nu == EMSMode.BATTERY_STANDBY:
+            self._standby_actief = True          # wat er ook gevraagd is: we weten dat hij in stand-by staat
         if nu != doel:
             log.warning("GoodWe EMS-modus is %s na opdracht %s", nu, doel.name)
             return False
@@ -210,6 +221,16 @@ class GoodWe:
         verwacht = self._laatste_opdracht[0].name if self._laatste_opdracht else None
         wm, ems = self.stand.get("werkmodus"), self.stand.get("ems")
         self.afwijking = None
+        if ems == "BATTERY_STANDBY" and not getattr(self, "_vraag_vasthouden", False):
+            # De accu staat in stand-by terwijl Energiebrein dat nu niet vraagt (bijvoorbeeld blijven hangen van eerder).
+            # Energiebrein regelt de accu, dus terug naar automatisch. Komt hij steeds terug, dan zet iemand anders hem zo.
+            if nu - getattr(self, "_ems_herstel", datetime.min.replace(tzinfo=timezone.utc)) > timedelta(minutes=10):
+                self._ems_herstel = nu
+                log.warning("GoodWe stond in stand-by zonder dat Energiebrein dat vraagt; terug naar automatisch")
+                if await self._standby(False):
+                    self.stand["ems"] = ems = "AUTO"
+        elif ems == "BATTERY_STANDBY":
+            self._standby_actief = True
         if ems and ems not in ("AUTO",) and not (ems == "BATTERY_STANDBY" and self._standby_actief):
             self.afwijking = (f"De omvormer staat in EMS-modus {ems}. Die gaat vóór de werkmodus en wordt niet door Energiebrein ingesteld; "
                               "waarschijnlijk stuurt een andere partij (bijvoorbeeld je energieleverancier via de GoodWe-cloud, of een instelling "
@@ -242,6 +263,9 @@ class GoodWe:
         from goodwe import OperationMode
         await self._zeker()
         a = self.cfg["accu"]
+        self._vraag_vasthouden = actie == "vasthouden" and self._standby_kan is not False
+        if actie != "vasthouden" and self.stand.get("ems") == "BATTERY_STANDBY":
+            self._standby_actief = True          # hangt nog in stand-by: eerst terug naar automatisch, anders doet de accu niets
         if actie == "vasthouden" and self._standby_kan is not False:
             if self._standby_actief:
                 return

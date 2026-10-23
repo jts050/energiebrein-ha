@@ -1,5 +1,10 @@
 # Wat er nieuw is
 
+## 1.6.5
+
+- Opgelost: de accu kon in stand-by blijven hangen. De GoodWe neemt de stand-by soms pas na een paar seconden over; Energiebrein keek te vroeg, dacht dat het niet lukte en vergat de stand-by weer uit te zetten. Daarna laadde de accu niet meer, ook niet met zonne-overschot. Nu kijkt hij een paar keer na, en staat de accu in stand-by terwijl Energiebrein dat niet vraagt, dan zet hij hem zelf terug op automatisch.
+- De meter-melding herkent nu ook als alle drie de fasen evenveel afwijken. Dan ligt het niet aan één klem, maar zien de klemmen de stroom van de omvormer zelf niet.
+
 ## 1.6.4
 
 - P1-regeling rustiger en fijner: stapjes van 0,1 kW in plaats van 0,4 kW. Hij komt nu ook op 0 kW uit als de omvormer veel meer laadt dan gevraagd.

@@ -492,8 +492,18 @@ class Brein:
         p1 = [sum(r[3][i] for r in rijen) / len(rijen) for i in range(3)]
         ct = [sum(r[4][i] for r in rijen) / len(rijen) for i in range(3)]
         delen, tips = [], []
+        d = [ct[i] - p1[i] for i in range(3)]
+        gelijk = all(x > 0.2 for x in d) or all(x < -0.2 for x in d)
+        if gelijk and max(abs(x) for x in d) < 2.5 * min(abs(x) for x in d):
+            # Alle drie de fasen even ver ernaast: dan ligt het niet aan één klem, maar aan wat de klemmen samen zien.
+            tips.append(f"op alle drie de fasen ziet de GoodWe ongeveer evenveel {'meer afname' if d[0] > 0 else 'minder afname'} "
+                        f"(samen {self._k(abs(sum(d)))} kW). Dan zien de klemmen waarschijnlijk de stroom van de omvormer zelf niet: "
+                        "is de omvormer aangesloten tussen de meter en de klemmen, of zitten de klemmen om een andere kabel dan de "
+                        "hoofdkabel?")
         for i in range(3):
             delen.append(f"L{i + 1}: slimme meter {self._k(p1[i])}, GoodWe {self._k(ct[i])}")
+            if gelijk:
+                continue
             if abs(p1[i]) > 0.2 and abs(ct[i] + p1[i]) < 0.35 * abs(p1[i]) and abs(ct[i] - p1[i]) > 0.4:
                 tips.append(f"de klem op L{i + 1} zit waarschijnlijk andersom (zelfde waarde, omgekeerd teken)")
             elif abs(p1[i]) > 0.3 and abs(ct[i]) < 0.05:
@@ -502,7 +512,8 @@ class Brein:
                 tips.append(f"L{i + 1} wijkt af: zit die klem op de goede fase?")
         tekst = " Per fase (kW, + = afname): " + "; ".join(delen) + "."
         if tips:
-            tekst += " Mogelijke oorzaak: " + "; ".join(tips) + ". (De fasenummers van de omvormer kunnen anders zijn dan die van de meter.)"
+            tips_tekst = "; ".join(tips)
+            tekst += " Mogelijke oorzaak: " + tips_tekst + ("" if tips_tekst.endswith("?") else ".") + " (De fasenummers van de omvormer kunnen anders zijn dan die van de meter.)"
         return tekst
 
     @staticmethod
