@@ -263,6 +263,8 @@ class Planner:
                            + (", het duurste moment van het komende etmaal." if duurste else "; dat levert nu meer op dan de lading bewaren."))
             elif k.accu_actie == "ontladen":
                 k.reden = f"Accu voedt het huis, inkoop zou {_euro(k.inkoop)} kosten."
+            elif k.inkoop >= hoog and k.soc_na <= float(self.cfg["accu"]["min_soc"]) + 1:
+                k.reden = f"Dure periode ({_euro(k.inkoop)}), maar de accu is leeg (op de ondergrens): het huis haalt stroom uit het net."
             elif k.inkoop >= hoog:
                 k.reden = "Dure periode, maar de accu bewaart zijn lading voor een nog duurder moment."
             else:
