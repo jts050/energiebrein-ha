@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -57,6 +58,7 @@ class Brein:
         self._taken: list[asyncio.Task] = []
         self._plan_nodig = asyncio.Event()
         self._laatst_gemeten: datetime | None = None
+        self._meter_reeks: deque = deque()      # (tijd, slimme meter kW, CT-meter omvormer kW) van de laatste 10 minuten
 
     # ------------------------------------------------------------ levenscyclus
     async def start(self):
@@ -244,6 +246,7 @@ class Brein:
         self._laatst_gemeten = nu
         if 0 < dt < 120:
             self.gesch.meet(m, inkoop, terug, dt, beurs)
+        self._vergelijk_meters(m, nu)
 
         b = {}
         self._p1_tekst = None
@@ -360,7 +363,14 @@ class Brein:
                     reden = reden if "leeg" in reden else "Het huis haalt de stroom nu van het net."
                 elif self.huis.kan_vasthouden:
                     b["accu"] = "Houdt lading vast voor een duurder moment"
-                    reden = f"Een kWh in de accu is straks {self._e(k.waarde_kwh)} waard; stroom kost nu {self._e(inkoop)}."
+                    straks = next((x for x in self.plan["kwartieren"] if x.start > k.start and x.accu_actie == "ontladen"), None)
+                    eta = math.sqrt(float(a.get("rendement", 0.9)))
+                    if straks and straks.inkoop > inkoop + 0.005:
+                        reden = (f"Om {straks.start.astimezone().strftime('%H:%M')} kost stroom {self._e(straks.inkoop)}; "
+                                 f"dan levert de lading meer op dan nu ({self._e(inkoop)}).")
+                    else:
+                        reden = (f"Een kWh uit de accu bespaart nu {self._e(inkoop * eta)} (na {round((1 - eta) * 100)}% verlies bij het "
+                                 f"ontladen); bewaard is hij straks {self._e(k.waarde_kwh)} waard.")
                 else:
                     b["accu"] = "Voedt het huis (lading vasthouden kan bij dit merk nog niet veilig)"
                     reden = ""
@@ -399,6 +409,30 @@ class Brein:
         b["reden"] = reden
         b["inkoop"], b["teruglever"], b["beurs"] = inkoop, terug, beurs
         self.besluit = b
+
+    def _vergelijk_meters(self, m: Meting, nu: datetime) -> None:
+        """Bijhouden of de CT-meter van de omvormer en de slimme meter hetzelfde zien. Eén meting zegt niets: de slimme meter
+        meet elke seconde, de omvormer loopt een paar seconden achter. Een waterkoker of warmtepomp die aan- of uitgaat,
+        geeft dan even een groot verschil zonder dat er iets mis is."""
+        reeks = self._meter_reeks
+        while reeks and (nu - reeks[0][0]).total_seconds() > 600:
+            reeks.popleft()
+        mk = getattr(self.huis.omvormer, "meter_kw", None)
+        if mk is None or not self.huis.p1 or self.cfg["omvormer"].get("meter_meet", "net") == "huis":
+            reeks.clear()
+            return
+        if m.net_kw > 0.8 or mk > 0.8:           # alleen als er echt iets van het net komt; bij weinig verbruik zegt het verschil weinig
+            reeks.append((nu, m.net_kw, mk))
+
+    def _meters_wijken_af(self) -> tuple[float, float] | None:
+        """Wijken de meters al minstens twee minuten (aan metingen) meestal meer dan 1 kW af? Dan de gemiddelden, anders None."""
+        reeks = list(self._meter_reeks)
+        if len(reeks) < 12:
+            return None
+        af = [r for r in reeks if abs(r[1] - r[2]) > 1.0]
+        if len(af) < 0.6 * len(reeks):
+            return None
+        return sum(r[1] for r in af) / len(af), sum(r[2] for r in af) / len(af)
 
     @staticmethod
     def _k(x: float) -> str:
@@ -519,7 +553,7 @@ class Brein:
             if titel not in nu:
                 self.logboek.schrijf("opgelost", f"Opgelost: {titel}", x.get("apparaat"))
                 if self.telefoon.bij_opgelost:
-                    self.telefoon.meld(titel, "Energiebrein: opgelost", titel)
+                    self.telefoon.meld(titel, "Energiebrein: opgelost", f"Geldt niet meer: {titel}.")
         self._storingen_vorig = nu
 
     # ------------------------------------------------------------ voor de app
@@ -556,12 +590,13 @@ class Brein:
                         "actie": "Druk op de knop om de ondergrens in de omvormer gelijk te zetten aan Energiebrein, of pas de ontlaaddiepte aan in de SolarGo-app.",
                         "knop": {"tekst": f"Ondergrens op {max(10, int(self.cfg['accu']['min_soc']))}% zetten", "actie": "ondergrens",
                                  "waarde": max(10, int(self.cfg["accu"]["min_soc"]))}})
-        mk = getattr(omv, "meter_kw", None)
-        if mk is not None and m and self.huis.p1 and self.cfg["omvormer"].get("meter_meet", "net") != "huis" and abs(m.net_kw - mk) > 1.0 and m.net_kw > 0.8:
+        afwijking = self._meters_wijken_af()
+        if afwijking and self.cfg["omvormer"].get("meter_meet", "net") != "huis":
+            p1, ct = afwijking
             uit.append({"ernst": "let op", "apparaat": "omvormer", "titel": "De meter van de GoodWe ziet iets anders dan je slimme meter",
-                        "uitleg": f"Je slimme meter meet {self._k(m.net_kw)} kW van het net, de CT-meter van de GoodWe {self._k(mk)} kW. "
-                                  "De accu voedt alleen wat zijn eigen meter ziet. Zit die meter niet op de hoofdaansluiting (alle fasen), "
-                                  "dan blijft de accu stil terwijl je huis van het net haalt.",
+                        "uitleg": f"De afgelopen minuten mat je slimme meter gemiddeld {self._k(p1)} kW van het net, de CT-meter van de GoodWe "
+                                  f"{self._k(ct)} kW. De accu voedt alleen wat zijn eigen meter ziet. Zit die meter niet op de hoofdaansluiting "
+                                  "(alle fasen), dan blijft de accu stil terwijl je huis van het net haalt.",
                         "actie": "Laat controleren of de CT-klemmen van de GoodWe om de hoofdkabels in de meterkast zitten, op alle drie de fasen en in de goede richting."})
         afw = getattr(self.huis.omvormer, "afwijking", None)
         if afw:

@@ -1,5 +1,12 @@
 # Wat er nieuw is
 
+## 1.6.1
+
+- De melding "De meter van de GoodWe ziet iets anders dan je slimme meter" komt pas als het verschil een paar minuten blijft. Eén meting, bijvoorbeeld net als de waterkoker aangaat, gaf een vals alarm: de slimme meter meet elke seconde, de omvormer loopt een paar seconden achter.
+- Lukt het uitlezen van de ondergrens van de omvormer een keer niet, dan houdt het brein de laatst bekende grens aan. Zo komen er geen meldingen "opgelost" en weer "terug" achter elkaar.
+- Een melding "opgelost" op je telefoon zegt nu duidelijk dat het niet meer geldt.
+- "Houdt lading vast" zegt nu wanneer stroom duurder wordt en wat die dan kost.
+
 ## 1.6.0
 
 - **Slim handelen.** De accu laadt en ontlaadt alleen als dat per kWh minstens de ingestelde winst oplevert (standaard € 0,03), bovenop laadverlies en slijtage. Geen rondjes accu meer voor een paar cent verschil.

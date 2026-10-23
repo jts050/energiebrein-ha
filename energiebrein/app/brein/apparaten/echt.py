@@ -197,9 +197,13 @@ class GoodWe:
             return
         self._stand_tijd = nu
         try:
-            self.stand = await asyncio.wait_for(self.lees_stand(), timeout=20)
+            nieuw = await asyncio.wait_for(self.lees_stand(), timeout=20)
         except Exception:
             return
+        # lukt het uitlezen van de ondergrens een keer niet, dan de laatst bekende houden (anders springt het plan heen en weer)
+        if "ondergrens_pct" not in nieuw and "ondergrens_pct" in self.stand:
+            nieuw["ondergrens_pct"] = self.stand["ondergrens_pct"]
+        self.stand = nieuw
         verwacht = self._laatste_opdracht[0].name if self._laatste_opdracht else None
         wm, ems = self.stand.get("werkmodus"), self.stand.get("ems")
         self.afwijking = None
