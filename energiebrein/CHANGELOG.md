@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.6.10
+
+- Op een tablet (staand) is het stroomschema op Thuis groter en staat het in het midden. De lijst "Wat de accu straks doet" en de prijsgrafiek gebruiken de hele breedte.
+
 ## 1.6.9
 
 - Klemmenproef: gaat er tijdens stap 1 een apparaat aan of uit (warmtepomp, oven), dan doet hij die stap vanzelf opnieuw in plaats van een onbetrouwbare uitslag te geven.
