@@ -54,6 +54,7 @@ class Planner:
         self.cfg = cfg
         self.ondergrens: float | None = None   # ondergrens die de omvormer zelf hanteert (%), als die hoger is
         self.storm: dict = {}                  # kwartier-start → reden (onweer, windstoten): dan de accu vol houden
+        self.eind_soc: float | None = None     # alleen voor de terugblik: eindig met deze lading (%), dan is de vergelijking eerlijk
         self._e_start = 0.0
         self._eindwaarde = 0.0
 
@@ -233,6 +234,10 @@ class Planner:
         eindwaarde = rest[len(rest) // 2] * eta * 0.85   # wat een kWh in de accu na de horizon waard is
         idx = np.arange(N + 1)
         V = -(idx * stap) * eindwaarde
+        if self.eind_soc is not None:
+            # terugblik: net zoveel lading aan het eind als er echt in zat; elke kWh verschil kost € 1
+            doel_eind = int(round((min(max(cap * self.eind_soc / 100, lo), hi) - lo) / stap))
+            V = np.abs(idx - doel_eind) * stap * 1.0
         keuze = np.zeros((T, N + 1), dtype=np.int16)
         deltas = np.arange(-dn, up + 1)
         na = [None] * T            # kosten-tot-het-einde na elk kwartier (voor de waarde van een kWh)

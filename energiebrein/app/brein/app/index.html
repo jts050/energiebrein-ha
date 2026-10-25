@@ -609,6 +609,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 @media (min-width:600px) and (max-width:980px){.stroom svg{max-width:min(100%,620px);margin:0 auto}.straks-sectie,.spark-sectie{max-width:none}}
 .vg-kop{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:14px 0 2px;font-size:14px}.vg-kop span{color:var(--muted);font-size:13px}
 .cijfer.slecht b{color:var(--bad)}
+.tb-zin{margin:4px 0 10px;line-height:1.5}.tb-score{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted)}.tb-score b{color:var(--ink)}.tb-balk{flex:0 0 120px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}.tb-balk i{display:block;height:100%;background:var(--accu);border-radius:4px}.tb-tips{margin:10px 0 0;padding-left:18px;font-size:14px;line-height:1.5}.tb-tips li{margin:4px 0}
 </style>
 </head>
 <body>
@@ -658,6 +659,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         <div class="nu-rechts">
           <div class="sectie"><h2>Apparaten</h2><ul class="rijen" id="rijen"></ul></div>
           <div class="sectie"><h2>Vandaag</h2><div class="cijfers" id="vandaag"></div></div>
+          <div class="sectie" id="terugblik-sectie" hidden><h2>Gisteren achteraf</h2><div id="terugblik"></div></div>
           <div class="sectie" id="conditie-sectie" hidden><h2>Conditie van de accu</h2><div class="cijfers" id="conditie"></div><p class="note" id="conditie-uitleg"></p></div>
           <div class="sectie opb"><h2>Wat het je oplevert</h2><div id="opbrengst"><p class="klein">Na een dag meten zie je hier wat zon, accu en het brein je opleveren.</p></div></div>
           <div class="sectie"><h2>Wat het brein over je huis weet</h2><div class="ai" id="ai"></div></div>
@@ -1131,8 +1133,18 @@ function renderConditie(){const c=S.conditie||{},sec=$('conditie-sectie');if(!se
     :'')+(cap?`Gemeten uit ${c.capaciteit_stukken} keer flink laden of ontladen. `:'De gemeten capaciteit verschijnt zodra de accu een paar keer minstens een kwart geladen of ontladen is. ')
     +'De accu zelf meldt vaak jarenlang 100%; de gemeten capaciteit laat eerder zien of hij slijt.';
 }
+function renderTerugblik(){const t=S.terugblik||{},d=t.laatste,sec=$('terugblik-sectie');if(!sec)return;
+  if(!d){sec.hidden=true;return;}sec.hidden=false;
+  const dag=new Date(d.dag+'T12:00'),gist=new Date(Date.now()-864e5).toDateString()===dag.toDateString();
+  const wanneer=gist?'Gisteren':dag.toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'}).replace(/^./,c=>c.toUpperCase());
+  const sc=d.score!=null?Math.round(d.score*100):null;
+  let h=`<p class="tb-zin">${wanneer} kostte stroom <b>${eur(d.echt)}</b>. Had het brein alles vooraf geweten (prijzen, verbruik en zon), dan was het <b>${eur(d.beste)}</b> geweest.</p>`;
+  if(sc!=null)h+=`<div class="tb-score"><div class="tb-balk"><i style="width:${sc}%"></i></div><span><b>${sc}%</b> van wat de accu maximaal had kunnen besparen</span></div>`;
+  if(t.score_week!=null&&t.dagen_week>=3)h+=`<p class="note">Afgelopen ${t.dagen_week} dagen gemiddeld ${Math.round(t.score_week*100)}%.</p>`;
+  h+=(d.tips||[]).length?'<ul class="tb-tips">'+d.tips.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':(d.echt-d.beste<0.1?'<p class="note">Bijna perfect: achteraf had het niet beter gekund.</p>':'');
+  $('terugblik').innerHTML=h;}
 function renderStatus(){
-  renderFasen();renderSolcast();renderConditie();if(S.klemtest&&(S.klemtest.bezig||S.klemtest.klaar)&&!(KT&&(KT.bezig||KT.klaar)))renderKlemtest(S.klemtest);
+  renderFasen();renderSolcast();renderConditie();renderTerugblik();if(S.klemtest&&(S.klemtest.bezig||S.klemtest.klaar)&&!(KT&&(KT.bezig||KT.klaar)))renderKlemtest(S.klemtest);
   const m=S.meting,b=S.besluit||{},a=S.apparaten||{},v=S.voorspelling||{},ai=v.ai_huis||{};
   const st=(S.storingen||[]).filter(x=>x.ernst!=='info'), storing=st.length;
   $('railvoet').innerHTML=`<span><i class="stip ${S.simulatie?'warn':''}"></i>${S.simulatie?'Simulatie':'Je eigen huis'}</span>

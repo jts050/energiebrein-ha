@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.9.0
+
+- **Gisteren achteraf** op Thuis. Elke dag rekent het brein uit wat het beste accuplan was geweest als het alles vooraf had geweten (de echte prijzen, het echte verbruik en de echte zon), met dezelfde lading aan het begin en eind. Je ziet wat stroom kostte, wat het had kunnen kosten, welk deel van de maximale besparing het brein haalde (ook als weekgemiddelde), en waar het misging: accu te vroeg leeg, onnodig uit het net geladen, te veel of te weinig verkocht, of een voorspelling die ernaast zat.
+
 ## 1.8.0
 
 - **Conditie van de accu** op Thuis: gezondheid volgens de accu zelf, de gemeten capaciteit (hoeveel kWh er echt in past), het aantal keer dat de accu helemaal rond is geweest, het rendement, de temperatuur en het aantal modules. Per maand wordt de capaciteit bewaard, zodat je ziet of de accu slijt. Een melding als een module wegvalt, de capaciteit onder 80% komt of de accu erg warm of koud is.

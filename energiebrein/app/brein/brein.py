@@ -28,6 +28,8 @@ class Brein:
         self.voorsp = Voorspelling(cfg, self.gesch)
         from .conditie import Conditie
         self.conditie = Conditie(cfg, self.gesch, data_map(cfg))
+        from .terugblik import Terugblik
+        self.terugblik = Terugblik(data_map(cfg))
         self.planner = Planner(cfg)
         self.planner.temp = self.voorsp.weer.op if hasattr(self.voorsp, "weer") else None
         from .licentie import Licentie
@@ -838,6 +840,10 @@ class Brein:
             self.conditie.bereken(getattr(self.huis.omvormer, "bms", None))
         except Exception:
             log.exception("Conditie van de accu uitrekenen mislukt")
+        try:
+            self.terugblik.doe(self)          # gisteren achteraf, als dat nog niet is uitgerekend
+        except Exception:
+            log.exception("Terugblik mislukt")
 
     def waarde_lading(self) -> float:
         """Wat een kWh die nu in de accu zit straks ongeveer waard is: de gemiddelde inkoopprijs van het komende etmaal,
@@ -864,7 +870,7 @@ class Brein:
                                     "min_ingesteld": float(self.cfg["accu"]["min_soc"]), "min_omvormer": self._omvormer_grens(),
                                     "terugverkopen": mag_verkopen(self.cfg["accu"]),
                                     "min_winst": float(self.cfg["accu"].get("min_winst_per_kwh", 0.0) or 0.0)},
-                "klemtest": self.klemtest.dict(), "conditie": self.conditie.laatst,
+                "klemtest": self.klemtest.dict(), "conditie": self.conditie.laatst, "terugblik": self.terugblik.status(),
                 "fasen": {"p1": getattr(self.huis.p1, "fasen", None), "omvormer": getattr(self.huis.omvormer, "meter_fasen", None)},
                 "prijsbron": self.prijzen.bron, "simulatie": bool(self.huis.sim),
                 "apparaten": self.huis.onderdelen(), "fouten": self.huis.fouten, "meldingen": self.huis.meldingen,
