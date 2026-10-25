@@ -1,5 +1,11 @@
 # Wat er nieuw is
 
+## 1.10.0
+
+- **Nieuw tabblad Kosten.** Deze maand, vorige maand of dit jaar: hoeveel je bespaarde, wat stroom kostte, wat het zonder zon en accu had gekost, wat de accu en het brein opleverden, terugleveren, de beste dag, en de kWh (zon, zelf gebruikt, net, auto, warmtepomp). Met een staafje per dag (of per maand). Ook "Vandaag" en "Gisteren achteraf" staan hier nu.
+- **Thuis is rustiger.** Alleen het nu: prijs, stroomschema, wat het brein doet en straks doet, de prijs, je apparaten, een korte kostensamenvatting en de conditie van de accu. "Wat het brein over je huis weet" staat nu onder Plan.
+- **Stormstand zichtbaar.** Gaat de stormstand aan, dan staat er bovenaan Thuis een balk met waarom en tot wanneer de accu vol wordt gehouden (naast de melding op je telefoon).
+
 ## 1.9.0
 
 - **Gisteren achteraf** op Thuis. Elke dag rekent het brein uit wat het beste accuplan was geweest als het alles vooraf had geweten (de echte prijzen, het echte verbruik en de echte zon), met dezelfde lading aan het begin en eind. Je ziet wat stroom kostte, wat het had kunnen kosten, welk deel van de maximale besparing het brein haalde (ook als weekgemiddelde), en waar het misging: accu te vroeg leeg, onnodig uit het net geladen, te veel of te weinig verkocht, of een voorspelling die ernaast zat.

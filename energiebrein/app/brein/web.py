@@ -213,6 +213,13 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
         return opbrengst(B().gesch.rijen(nu - timedelta(days=dagen + 1), nu + timedelta(days=1)), B().prijzen, dagen,
                          float(a.get("capaciteit_kwh") or 0), float(a.get("rendement", 0.9)) ** 0.5)
 
+    @app.get("/api/kosten")
+    async def kosten_api(periode: str = "maand"):
+        """Kostenoverzicht voor deze maand, vorige maand of dit jaar."""
+        from .opbrengst import kosten_periode
+        a = staat["cfg"]["accu"]
+        return kosten_periode(B().gesch, B().prijzen, periode, float(a.get("capaciteit_kwh") or 0), float(a.get("rendement", 0.9)) ** 0.5)
+
     @app.get("/api/leveranciers")
     async def leveranciers():
         return vgl.lijst()

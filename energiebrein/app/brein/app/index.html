@@ -67,7 +67,7 @@ main{min-width:0;padding:max(22px,env(safe-area-inset-top)) max(28px,env(safe-ar
   .app{grid-template-columns:1fr}
   .rail{display:none}
   main{padding:max(18px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
-  .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:20;
+  .tabbar{display:grid;grid-template-columns:repeat(6,1fr);position:fixed;left:0;right:0;bottom:0;z-index:20;
     padding:8px max(10px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));
     background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line)}
   .tabbar button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--muted);padding:6px 0}
@@ -610,6 +610,11 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 .vg-kop{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:14px 0 2px;font-size:14px}.vg-kop span{color:var(--muted);font-size:13px}
 .cijfer.slecht b{color:var(--bad)}
 .tb-zin{margin:4px 0 10px;line-height:1.5}.tb-score{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted)}.tb-score b{color:var(--ink)}.tb-balk{flex:0 0 120px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}.tb-balk i{display:block;height:100%;background:var(--accu);border-radius:4px}.tb-tips{margin:10px 0 0;padding-left:18px;font-size:14px;line-height:1.5}.tb-tips li{margin:4px 0}
+.kort-rij{display:flex;gap:24px;flex-wrap:wrap;margin:2px 0 12px}.kort-rij div{display:flex;flex-direction:column}.kort-rij b{font-size:22px;font-weight:700;letter-spacing:-.02em}.kort-rij b.goed{color:var(--good)}.kort-rij span{font-size:13px;color:var(--muted)}
+.kosten-blok .staafjes{height:110px;justify-content:stretch}.kosten-blok .staafjes i{flex:1 1 0;min-width:0}
+#v-kosten .blok+.blok,#v-kosten .blok+.tweekol{margin-top:34px}#v-kosten .tweekol{gap:34px}
+@media (max-width:420px){.tabbar button{font-size:10.5px}}
+.stormbalk{display:flex;gap:12px;align-items:flex-start;border:1px solid color-mix(in srgb,var(--accu) 50%,transparent);border-radius:12px;padding:12px 14px;margin-bottom:14px}.stormbalk .stip{width:10px;height:10px;border-radius:50%;background:var(--accu);margin-top:5px;flex:none}.stormbalk p{margin:2px 0 0;color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
@@ -633,6 +638,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
     <div class="merk"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="10" fill="var(--accu)"/><path d="M9 17 16 9l7 8M11 15.5V23h10v-7.5" fill="none" stroke="var(--bg)" stroke-width="2.4" stroke-linejoin="round"/><path d="m16.8 15-2.2 3.3h2.8L15.2 21.6" fill="none" stroke="var(--bg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Energiebrein</div>
     <nav class="menu" aria-label="Hoofdmenu">
       <button data-view="thuis"><svg><use href="#i-huis"/></svg>Thuis</button>
+      <button data-view="kosten"><svg><use href="#i-euro"/></svg>Kosten</button>
       <button data-view="plan"><svg><use href="#i-plan"/></svg>Plan</button>
       <button data-view="bediening"><svg><use href="#i-knop"/></svg>Bediening</button><button data-view="logboek"><svg><use href="#i-log"/></svg>Logboek</button>
       <button data-view="koppelen"><svg><use href="#i-koppel"/></svg>Koppelen</button>
@@ -643,6 +649,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
   <main>
     <!-- ============ THUIS ============ -->
     <section id="v-thuis" data-v>
+      <div class="stormbalk" id="stormbalk" hidden></div>
       <div class="storingen" id="storingen" hidden></div>
       <div class="nu">
         <div class="nu-links">
@@ -658,12 +665,22 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         </div>
         <div class="nu-rechts">
           <div class="sectie"><h2>Apparaten</h2><ul class="rijen" id="rijen"></ul></div>
-          <div class="sectie"><h2>Vandaag</h2><div class="cijfers" id="vandaag"></div></div>
-          <div class="sectie" id="terugblik-sectie" hidden><h2>Gisteren achteraf</h2><div id="terugblik"></div></div>
+          <div class="sectie kort"><h2>Kosten</h2><div id="kosten-kort"><p class="klein">Na een dag meten zie je hier wat het je oplevert.</p></div>
+            <button class="btn" type="button" data-view="kosten">Kostenoverzicht</button></div>
           <div class="sectie" id="conditie-sectie" hidden><h2>Conditie van de accu</h2><div class="cijfers" id="conditie"></div><p class="note" id="conditie-uitleg"></p></div>
-          <div class="sectie opb"><h2>Wat het je oplevert</h2><div id="opbrengst"><p class="klein">Na een dag meten zie je hier wat zon, accu en het brein je opleveren.</p></div></div>
-          <div class="sectie"><h2>Wat het brein over je huis weet</h2><div class="ai" id="ai"></div></div>
         </div>
+      </div>
+    </section>
+
+    <!-- ============ KOSTEN ============ -->
+    <section id="v-kosten" data-v hidden>
+      <div class="kop1"><div><h1>Kosten</h1><p>Wat stroom kost, en wat je zon, accu en het brein je opleveren.</p></div>
+        <div class="keuze" id="kosten-periode"><button data-p="maand" aria-pressed="true">Deze maand</button><button data-p="vorige">Vorige maand</button><button data-p="jaar">Dit jaar</button></div></div>
+      <div class="blok opb kosten-blok"><div id="kosten-kop"><p class="klein">Laden…</p></div></div>
+      <div class="blok"><h2>Waar het in zit</h2><div class="cijfers" id="kosten-cijfers"></div><p class="note" id="kosten-uitleg"></p></div>
+      <div class="tweekol">
+        <div class="blok"><h2>Vandaag</h2><div class="cijfers" id="vandaag"></div></div>
+        <div class="blok" id="terugblik-sectie" hidden><h2>Gisteren achteraf</h2><div id="terugblik"></div></div>
       </div>
     </section>
 
@@ -700,6 +717,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         <div class="blok"><h2>Verwachting</h2><div class="cijfers" id="verwachting"></div></div>
       </div>
       </div>
+      <div class="blok"><h2>Wat het brein over je huis weet</h2><div class="ai" id="ai"></div></div>
     </section>
 
     <!-- ============ BEDIENING ============ -->
@@ -996,6 +1014,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 
   <nav class="tabbar" aria-label="Hoofdmenu">
     <button data-view="thuis"><svg><use href="#i-huis"/></svg>Thuis</button>
+    <button data-view="kosten"><svg><use href="#i-euro"/></svg>Kosten</button>
     <button data-view="plan"><svg><use href="#i-plan"/></svg>Plan</button>
     <button data-view="bediening"><svg><use href="#i-knop"/></svg>Bediening</button><button data-view="logboek"><svg><use href="#i-log"/></svg>Logboek</button>
     <button data-view="koppelen"><svg><use href="#i-koppel"/></svg>Koppelen</button>
@@ -1030,13 +1049,14 @@ async function api(pad,body){
 }
 
 /* ---------- navigatie ---------- */
-const VIEWS=['thuis','plan','bediening','logboek','koppelen'];
+const VIEWS=['thuis','kosten','plan','bediening','logboek','koppelen'];
 function view(v){if(!VIEWS.includes(v))v='thuis';
   document.querySelectorAll('[data-v]').forEach(s=>s.hidden=s.id!=='v-'+v);
   document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-current',b.dataset.view===v?'page':'false'));
   if(v==='koppelen')laadInstellingen();
   if(v==='logboek')setTimeout(laadLogboek,0);
   if(v==='plan'&&P)renderPlan();
+  if(v==='kosten')laadKosten();
   try{history.replaceState(null,'','#'+v)}catch(e){}
   window.scrollTo(0,0);}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>view(b.dataset.view));
@@ -1143,8 +1163,12 @@ function renderTerugblik(){const t=S.terugblik||{},d=t.laatste,sec=$('terugblik-
   if(t.score_week!=null&&t.dagen_week>=3)h+=`<p class="note">Afgelopen ${t.dagen_week} dagen gemiddeld ${Math.round(t.score_week*100)}%.</p>`;
   h+=(d.tips||[]).length?'<ul class="tb-tips">'+d.tips.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':(d.echt-d.beste<0.1?'<p class="note">Bijna perfect: achteraf had het niet beter gekund.</p>':'');
   $('terugblik').innerHTML=h;}
+function renderStorm(){const el=$('stormbalk'),s=S.storm;if(!el)return;if(!s){el.hidden=true;return;}
+  const van=new Date(s.van),tot=new Date(s.tot),nu=new Date(),dag=d=>d.toDateString()===nu.toDateString()?'':d.toLocaleDateString('nl-NL',{weekday:'long'})+' ';
+  const tijd=d=>d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}),bezig=van<=nu;
+  el.hidden=false;el.innerHTML=`<i class="stip"></i><div><b>Stormstand ${bezig?'staat aan':'gaat aan'}</b><p>${esc(s.reden.charAt(0).toUpperCase()+s.reden.slice(1))} verwacht. De accu wordt ${bezig?'':'vanaf '+dag(van)+tijd(van)+' '}vol gehouden tot ${dag(tot)}${tijd(tot)}, voor als de stroom uitvalt.</p></div>`;}
 function renderStatus(){
-  renderFasen();renderSolcast();renderConditie();renderTerugblik();if(S.klemtest&&(S.klemtest.bezig||S.klemtest.klaar)&&!(KT&&(KT.bezig||KT.klaar)))renderKlemtest(S.klemtest);
+  renderFasen();renderStorm();renderSolcast();renderConditie();renderTerugblik();if(S.klemtest&&(S.klemtest.bezig||S.klemtest.klaar)&&!(KT&&(KT.bezig||KT.klaar)))renderKlemtest(S.klemtest);
   const m=S.meting,b=S.besluit||{},a=S.apparaten||{},v=S.voorspelling||{},ai=v.ai_huis||{};
   const st=(S.storingen||[]).filter(x=>x.ernst!=='info'), storing=st.length;
   $('railvoet').innerHTML=`<span><i class="stip ${S.simulatie?'warn':''}"></i>${S.simulatie?'Simulatie':'Je eigen huis'}</span>
@@ -1351,15 +1375,40 @@ function uitleg(){const k=P&&P.kwartieren[focusIdx];if(!k)return;
   const wat=k.accu_actie==='laden'?'accu laadt':verkoopt(k)?'accu verkoopt aan het net':k.accu_actie==='ontladen'?'accu voedt het huis':'accu wacht';
   $('uitleg').innerHTML=`<b>${focusIdx===0?'Nu':dag(k.start).slice(0,2)+' '+tijd(k.start)} · ${eur(k.inkoop)} per kWh · ${wat} · lading naar ${nf(k.soc_na,0)}%</b><span>${esc(k.reden)}</span>`;}
 
-async function laadOpbrengst(){try{const o=await api('/api/opbrengst?dagen=30');const el=$('opbrengst');
-  if(!o.dagen.length||o.dagen.every(d=>Math.abs(d.besparing)<0.005))return;
-  const laatste=o.dagen.slice(-14),mx=Math.max(...laatste.map(d=>Math.abs(d.besparing)),0.01),vandaag=new Date().toISOString().slice(0,10);
+let OPB=null,KP='maand';
+async function laadOpbrengst(){try{OPB=await api('/api/opbrengst?dagen=30');renderKostenKort();}catch(e){}}
+function renderKostenKort(){const o=OPB,el=$('kosten-kort');if(!o||!el||!o.dagen.length)return;
+  const vd=new Date().toISOString().slice(0,10),d=o.dagen.find(x=>x.dag===vd);
   const maandnaam=new Date().toLocaleDateString('nl-NL',{month:'long'});
-  el.innerHTML=`<div class="groot">${eur(o.maand.besparing)}</div><span class="klein">bespaard in ${maandnaam}, vergeleken met alle stroom van het net halen</span>
-    <div class="staafjes" role="img" aria-label="Besparing per dag, laatste ${laatste.length} dagen">${laatste.map(d=>`<i class="${d.besparing<0?'min':''}${d.dag===vandaag?' vd':''}" style="height:${Math.max(Math.abs(d.besparing)/mx*100,4)}%" title="${new Date(d.dag).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'})}: ${eur(d.besparing)}"></i>`).join('')}</div>
-    <div class="as"><span>${new Date(laatste[0].dag).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}</span><span>vandaag</span></div>
-    <ul class="regels"><li><span>Door de accu en het brein</span><b>${eur(o.maand.door_accu)}</b></li><li><span>Terugleveren leverde op</span><b>${eur(o.maand.teruglevering)}</b></li>
-    ${o.volle_dagen>=3?`<li><span>Verwacht per jaar</span><b>± ${eur(o.per_jaar).replace(',00','')}</b></li>`:''}</ul>`;}catch(e){}}
+  el.innerHTML=`<div class="kort-rij"><div><b class="goed">${eur(o.maand.besparing)}</b><span>bespaard in ${maandnaam}</span></div>`+
+    (d?`<div><b>${eur(d.kosten)}</b><span>stroomkosten vandaag</span></div>`:'')+'</div>';}
+function staafjes(lijst,veld,label){const mx=Math.max(...lijst.map(d=>Math.abs(d[veld])),0.01),vd=new Date().toISOString().slice(0,10);
+  return `<div class="staafjes" role="img" aria-label="${label}">${lijst.map(d=>`<i class="${d[veld]<0?'min':''}${d.dag===vd?' vd':''}" style="height:${Math.max(Math.abs(d[veld])/mx*100,4)}%" title="${d.titel}: ${eur(d[veld])}"></i>`).join('')}</div>`;}
+async function laadKosten(){try{const k=await api('/api/kosten?periode='+KP),t=k.totaal;
+  const naam=KP==='jaar'?'in '+new Date().getFullYear():'in '+new Date(k.van+'T12:00').toLocaleDateString('nl-NL',{month:'long'});
+  if(!t.dagen){$('kosten-kop').innerHTML=`<p class="klein">Nog geen metingen ${naam}.</p>`;$('kosten-cijfers').innerHTML='';$('kosten-uitleg').textContent='';return;}
+  let lijst,as;
+  if(KP==='jaar'){lijst=k.maanden.map(m=>({...m,dag:m.maand,titel:new Date(m.maand+'-15').toLocaleDateString('nl-NL',{month:'long'})}));
+    as=lijst.length?[new Date(lijst[0].maand+'-15').toLocaleDateString('nl-NL',{month:'short'}),new Date(lijst[lijst.length-1].maand+'-15').toLocaleDateString('nl-NL',{month:'short'})]:['',''];}
+  else{lijst=k.dagen.map(d=>({...d,titel:new Date(d.dag+'T12:00').toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'})}));
+    as=[new Date(k.dagen[0].dag+'T12:00').toLocaleDateString('nl-NL',{day:'numeric',month:'short'}),KP==='maand'?'vandaag':new Date(k.dagen[k.dagen.length-1].dag+'T12:00').toLocaleDateString('nl-NL',{day:'numeric',month:'short'})];}
+  const beste=lijst.reduce((a,d)=>d.besparing>(a?a.besparing:-1e9)?d:a,null);
+  $('kosten-kop').innerHTML=`<div class="groot">${eur(t.besparing)}</div><span class="klein">bespaard ${naam}, vergeleken met alle stroom van het net halen</span>
+    ${staafjes(lijst,'besparing',KP==='jaar'?'Besparing per maand':'Besparing per dag')}<div class="as"><span>${as[0]}</span><span>${as[1]}</span></div>
+    <ul class="regels"><li><span>Stroomkosten</span><b>${eur(t.kosten)}</b></li>
+    <li><span>Zonder zon en accu had het gekost</span><b>${eur(t.zonder_alles)}</b></li>
+    <li><span>Waarvan bespaard door de accu en het brein</span><b>${eur(t.door_accu)}</b></li>
+    <li><span>Terugleveren leverde op</span><b>${eur(t.teruglevering)}</b></li>
+    ${beste&&lijst.length>2?`<li><span>Beste ${KP==='jaar'?'maand':'dag'}</span><b>${beste.titel}: ${eur(beste.besparing)}</b></li>`:''}
+    ${KP==='maand'&&OPB&&OPB.volle_dagen>=3?`<li><span>Verwacht per jaar</span><b>± ${eur(OPB.per_jaar).replace(',00','')}</b></li>`:''}</ul>`;
+  const c=(w,s)=>`<div class="cijfer"><b>${w}</b><span>${s}</span></div>`;
+  $('kosten-cijfers').innerHTML=c(nf(t.zon_kwh,0)+' kWh','Opgewekt door je panelen')+(t.zelf_gebruikt_pct!=null?c(t.zelf_gebruikt_pct+'%','Van je zonnestroom zelf gebruikt'):'')+
+    c(nf(t.verbruik_kwh,0)+' kWh','Verbruik in totaal')+c(nf(t.afname_kwh,0)+' / '+nf(t.terug_kwh,0)+' kWh','Van het net / teruggeleverd')+
+    (t.auto_kwh>0.5?c(nf(t.auto_kwh,0)+' kWh','In de auto geladen'):'')+(t.wp_kwh>0.5?c(nf(t.wp_kwh,0)+' kWh','Warmtepomp'):'')+
+    (t.afname_kwh>0?c(eur(t.kosten/Math.max(t.afname_kwh,1)),'Gemiddeld per kWh van het net'):'');
+  $('kosten-uitleg').textContent='Bespaard is wat alle stroom van het net had gekost, min wat je echt betaalde. Stroom die nog in de accu zit, telt mee tegen de prijs van die dag.';
+}catch(e){$('kosten-kop').innerHTML=`<p class="note">${esc(e.message)}</p>`;}}
+document.querySelectorAll('#kosten-periode button').forEach(b=>b.onclick=()=>{KP=b.dataset.p;document.querySelectorAll('#kosten-periode button').forEach(x=>x.setAttribute('aria-pressed',x===b));laadKosten();});
 async function laadStatus(){try{S=await api('/api/status');renderStatus();$('err').hidden=true;}catch(e){$('err').textContent='Geen verbinding met het brein. Draait het programma nog? ('+e.message+')';$('err').hidden=false;}}
 async function laadPlan(){try{P=await api('/api/plan');if(S&&S.besluit&&S.besluit.inkoop!=null&&$('prijs'))$('prijs').innerHTML=`<span class="groot">${eur(S.besluit.inkoop)}</span>${prijsTrend(S.besluit.inkoop)}`;if(!$('v-plan').hidden)renderPlan();renderSpark();if(S)renderStraks();}catch(e){}}
 
@@ -1850,7 +1899,7 @@ async function laadLogboek(){if($('v-logboek').hidden)return;
 document.querySelectorAll('#lbfilter button').forEach(b=>b.onclick=()=>{LBSOORT=b.dataset.s;document.querySelectorAll('#lbfilter button').forEach(x=>x.setAttribute('aria-pressed',x===b));laadLogboek();});
 $('lbdagen').onchange=laadLogboek;
 setInterval(laadLogboek,30000);
-setInterval(laadOpbrengst,300000);
+setInterval(()=>{laadOpbrengst();if(!$('v-kosten').hidden)laadKosten();},300000);
 setInterval(laadStatus,5000);
 setInterval(laadPlan,60000);
 </script>

@@ -147,6 +147,7 @@ class Brein:
 
     def stormkwartieren(self, kw: list) -> dict:
         """Met de stormstand aan: de kwartieren vanaf 2 uur vóór tot het eind van onweer of zware windstoten."""
+        self.storm_info = None
         if not self.cfg["accu"].get("stormstand"):
             return {}
         storm = self.voorsp.weer.storm
@@ -158,6 +159,8 @@ class Brein:
                     break
         if uit:
             eerste = min(uit)
+            self.storm_info = {"reden": uit[eerste], "van": eerste.isoformat(),
+                               "tot": (max(uit) + timedelta(minutes=15)).isoformat()}
             sleutel = f"storm-{eerste.astimezone():%Y-%m-%d}"
             if sleutel not in getattr(self, "_prijs_gemeld", set()):
                 self._prijs_gemeld = getattr(self, "_prijs_gemeld", set()) | {sleutel}
@@ -870,7 +873,7 @@ class Brein:
                                     "min_ingesteld": float(self.cfg["accu"]["min_soc"]), "min_omvormer": self._omvormer_grens(),
                                     "terugverkopen": mag_verkopen(self.cfg["accu"]),
                                     "min_winst": float(self.cfg["accu"].get("min_winst_per_kwh", 0.0) or 0.0)},
-                "klemtest": self.klemtest.dict(), "conditie": self.conditie.laatst, "terugblik": self.terugblik.status(),
+                "klemtest": self.klemtest.dict(), "conditie": self.conditie.laatst, "terugblik": self.terugblik.status(), "storm": getattr(self, "storm_info", None),
                 "fasen": {"p1": getattr(self.huis.p1, "fasen", None), "omvormer": getattr(self.huis.omvormer, "meter_fasen", None)},
                 "prijsbron": self.prijzen.bron, "simulatie": bool(self.huis.sim),
                 "apparaten": self.huis.onderdelen(), "fouten": self.huis.fouten, "meldingen": self.huis.meldingen,

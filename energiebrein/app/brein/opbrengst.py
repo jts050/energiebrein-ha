@@ -67,3 +67,42 @@ def opbrengst(rijen: list[dict], prijzen, dagen: int = 30, accu_kwh: float = 0.0
             "maand": {"besparing": som(maand, "besparing"), "door_accu": som(maand, "door_accu"),
                       "teruglevering": som(maand, "teruglevering"), "kosten": som(maand, "kosten"), "dagen": len(maand)},
             "per_jaar": round(gem * 365), "volle_dagen": len(volle)}
+
+
+def kosten_periode(gesch, prijzen, periode: str, accu_kwh: float, eta: float) -> dict:
+    """Totalen en per dag (of per maand bij 'jaar') voor het kostenoverzicht."""
+    from datetime import date, time, timedelta, timezone
+    vandaag = datetime.now().astimezone().date()
+    if periode == "vorige":
+        eind = vandaag.replace(day=1)
+        begin = (eind - timedelta(days=1)).replace(day=1)
+    elif periode == "jaar":
+        begin, eind = vandaag.replace(month=1, day=1), vandaag + timedelta(days=1)
+    else:
+        periode, begin, eind = "maand", vandaag.replace(day=1), vandaag + timedelta(days=1)
+    van = datetime.combine(begin, time(0)).astimezone() - timedelta(days=1)
+    tot = datetime.combine(eind, time(0)).astimezone()
+    rijen = gesch.rijen(van, tot)
+    o = opbrengst(rijen, prijzen, 400, accu_kwh, eta)
+    dagen = [d for d in o["dagen"] if begin.isoformat() <= d["dag"] < eind.isoformat()]
+    velden = ("kosten", "zonder_accu", "zonder_alles", "teruglevering", "zon_kwh", "besparing", "door_accu")
+    totaal = {k: round(sum(d[k] for d in dagen), 2) for k in velden}
+    # energie uit de metingen
+    eigen = [r for r in rijen if (r.get("n") or 0) >= 3 and begin.isoformat() <= datetime.fromisoformat(r["start"]).astimezone().date().isoformat() < eind.isoformat()]
+    som = lambda k: sum(r.get(k) or 0 for r in eigen)
+    totaal.update({"afname_kwh": round(som("afname_kwh"), 1), "terug_kwh": round(som("terug_kwh"), 1),
+                   "verbruik_kwh": round(som("huis_kwh") + som("wp_kwh") + som("auto_kwh"), 1),
+                   "auto_kwh": round(som("auto_kwh"), 1), "wp_kwh": round(som("wp_kwh"), 1)})
+    zon = totaal["zon_kwh"]
+    totaal["zelf_gebruikt_pct"] = round(max(zon - totaal["terug_kwh"], 0) / zon * 100) if zon > 1 else None
+    totaal["dagen"] = len(dagen)
+    maanden = []
+    if periode == "jaar":
+        per: dict = {}
+        for d in dagen:
+            m = per.setdefault(d["dag"][:7], {"maand": d["dag"][:7], **{k: 0.0 for k in velden}})
+            for k in velden:
+                m[k] += d[k]
+        maanden = [{k: (round(v, 2) if isinstance(v, float) else v) for k, v in m.items()} for m in per.values()]
+    return {"periode": periode, "van": begin.isoformat(), "tot": eind.isoformat(), "totaal": totaal,
+            "dagen": dagen if periode != "jaar" else [], "maanden": maanden}
