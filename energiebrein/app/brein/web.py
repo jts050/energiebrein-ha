@@ -40,6 +40,7 @@ INSTELBAAR = {
     "auto": ["merk", "gebruiker", "wachtwoord", "spin", "vin"],
     "meldingen": ["telefoon", "bij_opgelost"],
     "toegang": ["pincode"],
+    "zonvoorspelling": ["solcast_sleutel", "solcast_sites"],
 }
 
 
@@ -215,6 +216,33 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
     @app.get("/api/leveranciers")
     async def leveranciers():
         return vgl.lijst()
+
+    @app.post("/api/solcast/test")
+    async def solcast_test(d: dict):
+        """Haalt één keer de Solcast-voorspelling op met de ingevulde gegevens (telt als aanvraag bij Solcast)."""
+        from .solcast import Solcast, sites
+        cfg = copy.deepcopy(staat["cfg"])
+        cfg["zonvoorspelling"] = {"solcast_sleutel": (d.get("sleutel") or "").strip(), "solcast_sites": d.get("sites") or ""}
+        if not cfg["zonvoorspelling"]["solcast_sleutel"]:
+            return {"ok": False, "tekst": "Vul eerst je Solcast API-sleutel in."}
+        if not sites(cfg["zonvoorspelling"]["solcast_sites"]):
+            return {"ok": False, "tekst": "Vul het resource-ID van je rooftop site in (of plak de hele API-link)."}
+        sc = B().voorsp.solcast
+        sc.cfg = cfg
+        try:
+            from .net import sessie
+            async with sessie(30) as s:
+                goed = await sc.ververs(s, forceer=True)
+        finally:
+            sc.cfg = staat["cfg"]
+        if sc.fout or not goed:
+            return {"ok": False, "tekst": sc.fout or "Solcast gaf geen bruikbare voorspelling terug."}
+        nu = datetime.now(timezone.utc).astimezone()
+        morgen = (nu + timedelta(days=1)).date()
+        kwh = lambda dag: sum(w for t, w in sc.reeks.items() if t.astimezone().date() == dag) / 1000 * 0.5
+        k = lambda x: f"{x:.1f}".replace(".", ",")
+        return {"ok": True, "tekst": f"Gelukt. Solcast verwacht vandaag nog {k(kwh(nu.date()))} kWh en morgen {k(kwh(morgen))} kWh. "
+                                     "Sla op om hem te gebruiken."}
 
     @app.post("/api/tibber/test")
     async def tibber_test(d: dict):

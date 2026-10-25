@@ -913,6 +913,12 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         <h3 class="tussen">Dakvlakken voor de voorspelling</h3>
         <div id="vlakken"></div>
         <button class="btn" type="button" id="vlakerbij">Dakvlak toevoegen</button>
+        <h3 class="tussen">Solcast (optioneel, nauwkeuriger)</h3>
+        <p class="note">Heb je een account op solcast.com met je dak als rooftop site? Vul dan je API-sleutel en het resource-ID in (of plak de hele API-link). Het brein gebruikt dan de voorspelling van Solcast in plaats van forecast.solar. Een gratis account mag 10 aanvragen per dag; het brein vraagt er hooguit 8 en onthoudt de laatste voorspelling.</p>
+        <div><label class="f">API-sleutel<input id="k-sc-sleutel" autocomplete="off" spellcheck="false" placeholder="toolkit.solcast.com.au → Account → API Key"></label>
+          <label class="f">Resource-ID(s) van je rooftop site<input id="k-sc-sites" autocomplete="off" spellcheck="false" placeholder="0e8a-9602-…, meerdere met een komma"></label></div>
+        <div class="row"><button class="btn" type="button" id="sc-test">Test Solcast</button><span class="res" id="r-sc"></span></div>
+        <p class="note" id="sc-stand"></p>
         <div class="f3" style="margin-top:12px"><label class="f">Breedtegraad<input id="k-lat" type="number" step="0.01"></label><label class="f">Lengtegraad<input id="k-lon" type="number" step="0.01"></label></div>
         <p class="note">Groningen ± 53,2 / 6,6 · Amsterdam ± 52,4 / 4,9 · Eindhoven ± 51,4 / 5,5</p>
         </div>
@@ -1100,8 +1106,12 @@ document.addEventListener('click',async e=>{if(e.target.id!=='k-klemtest')return
   try{renderKlemtest(await api('/api/klemtest',KT&&KT.bezig?{stop:true}:{}));}
   catch(err){renderKlemtest({tekst:err.message,regels:[]});}
 });
+function renderSolcast(){const el=$('sc-stand');if(!el)return;const v=S.voorspelling||{},sc=v.solcast||{};
+  if(!sc.aan){el.textContent='';return;}
+  const t=sc.opgehaald?new Date(sc.opgehaald).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}):null;
+  el.textContent=(v.zon_bron==='solcast'?'In gebruik':'Nu niet in gebruik (forecast.solar)')+(t?` · laatst opgehaald om ${t}`:'')+` · ${sc.aanvragen_vandaag||0} aanvragen vandaag`+(sc.fout?` · ${sc.fout}`:'');}
 function renderStatus(){
-  renderFasen();if(S.klemtest&&(S.klemtest.bezig||S.klemtest.klaar)&&!(KT&&(KT.bezig||KT.klaar)))renderKlemtest(S.klemtest);
+  renderFasen();renderSolcast();if(S.klemtest&&(S.klemtest.bezig||S.klemtest.klaar)&&!(KT&&(KT.bezig||KT.klaar)))renderKlemtest(S.klemtest);
   const m=S.meting,b=S.besluit||{},a=S.apparaten||{},v=S.voorspelling||{},ai=v.ai_huis||{};
   const st=(S.storingen||[]).filter(x=>x.ernst!=='info'), storing=st.length;
   $('railvoet').innerHTML=`<span><i class="stip ${S.simulatie?'warn':''}"></i>${S.simulatie?'Simulatie':'Je eigen huis'}</span>
@@ -1469,7 +1479,7 @@ async function laadInstellingen(){
   if(!LEV){LEV=await api('/api/leveranciers');$('k-lev').innerHTML=Object.entries(LEV.leveranciers).map(([id,l])=>`<option value="${id}">${esc(l.naam)}</option>`).join('')+'<option value="anders">Andere leverancier (zelf invullen)</option>';}
   $('k-lev').value=LEV.leveranciers[c.prijzen.leverancier]?c.prijzen.leverancier:'anders';levInfo();
   const zet=(id,v)=>{$(id).value=v??'';};
-  zet('k-omv-type',c.omvormer.type||'uit');zet('k-omv-host',c.omvormer.host);zet('k-mb-poort',c.omvormer.modbus_poort||502);zet('k-mb-unit',c.omvormer.modbus_unit??1);zet('k-gebr',c.omvormer.gebruiker);zet('k-ww',c.omvormer.wachtwoord);zet('k-serie',c.omvormer.serienummer);$('k-sturen').checked=!!c.omvormer.sturen;$('k-huismeter').checked=c.omvormer.meter_meet==='huis';$('k-p1regel').checked=c.omvormer.regel==='p1';zet('k-sleutel',(c.net.p1||{}).sleutel);zet('k-lp-host',c.laadpaal.host);zet('k-tibber',c.prijzen.tibber_token);$('k-aftop').checked=!!c.omvormer.aftoppen_bij_negatieve_prijs;
+  zet('k-omv-type',c.omvormer.type||'uit');zet('k-omv-host',c.omvormer.host);zet('k-mb-poort',c.omvormer.modbus_poort||502);zet('k-mb-unit',c.omvormer.modbus_unit??1);zet('k-gebr',c.omvormer.gebruiker);zet('k-ww',c.omvormer.wachtwoord);zet('k-serie',c.omvormer.serienummer);$('k-sturen').checked=!!c.omvormer.sturen;$('k-huismeter').checked=c.omvormer.meter_meet==='huis';$('k-p1regel').checked=c.omvormer.regel==='p1';zet('k-sleutel',(c.net.p1||{}).sleutel);zet('k-lp-host',c.laadpaal.host);zet('k-tibber',c.prijzen.tibber_token);zet('k-sc-sleutel',(c.zonvoorspelling||{}).solcast_sleutel);zet('k-sc-sites',(c.zonvoorspelling||{}).solcast_sites);$('k-aftop').checked=!!c.omvormer.aftoppen_bij_negatieve_prijs;
   $('k-verkopen').checked=c.accu.terugverkopen!==false;$('k-zon-accu').checked=c.accu.zon_altijd_in_accu!==false;zet('k-accu-winst',c.accu.min_winst_per_kwh??0.03);
   if(c.omvormer.regel==='p1'||c.omvormer.meter_meet==='huis')document.querySelector('.extra.meet').open=true;
   zet('k-accu-cap',c.accu.capaciteit_kwh);const okw=+c.omvormer.vermogen_kw||Math.max(c.accu.max_laden_kw,c.accu.max_ontladen_kw,1);zet('k-omv-kw',okw);zet('k-accu-in',Math.round(c.accu.max_laden_kw/okw*100));zet('k-accu-uit',Math.round(c.accu.max_ontladen_kw/okw*100));zet('k-accu-min',c.accu.min_soc);zet('k-accu-max',c.accu.max_soc??100);accuKw();
@@ -1564,6 +1574,7 @@ $('kform').addEventListener('submit',async e=>{e.preventDefault();
     laadpaal:{type:$('k-lp-type').value,host:$('k-lp-host').value.trim(),gebruiker:$('k-lp-gebr').value.trim(),wachtwoord:$('k-lp-ww').value,serienummer:$('k-lp-serie').value.trim(),fasen:parseInt($('k-lp-fasen').value),max_stroom_a:n('k-lp-a'),auto_accu_kwh:n('k-lp-auto')},
     warmtepomp:{type:$('k-wp-type').value,relais1:$('k-wp-r1').value.trim(),relais2:$('k-wp-r2').value.trim(),meter:$('k-wp-meter').value.trim(),vermogen_kw:n('k-wp-kw'),jaarverbruik_kwh:n('k-wp-jaar'),comfort_tijden:$('k-wp-comfort').value.split(/[,;]/).map(x=>x.trim().replace(/\s+/g,'').replace(/–/g,'-')).filter(x=>/^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(x)),blokkeer_uren_per_dag:n('k-wp-blok'),max_wacht_achter_elkaar_uur:n('k-wp-run'),niet_wachten_onder_c:n('k-wp-min')},
     huis:{jaarverbruik_kwh:n('k-huis')},
+    zonvoorspelling:{solcast_sleutel:$('k-sc-sleutel').value.trim(),solcast_sites:$('k-sc-sites').value.trim()},
     meldingen:{telefoon:$('k-tel').value,bij_opgelost:$('k-tel-op').checked},
     toegang:{pincode:$('k-pin').value.trim()},
     auto:{merk:$('k-car-merk').value,gebruiker:$('k-car-gebr').value.trim(),wachtwoord:$('k-car-ww').value,spin:$('k-car-spin').value.trim(),vin:$('k-car-vin').value.trim()}};
@@ -1643,6 +1654,9 @@ $('kform').addEventListener('input',()=>{$('opslaan').hidden=false;});
 $('kform').addEventListener('change',()=>{$('opslaan').hidden=false;});
 $('kform').addEventListener('click',e=>{if(e.target.closest('#d-gebruik,#vlakerbij,.vlak .btn,#found button'))$('opslaan').hidden=false;});
 $('found').addEventListener('click',e=>{if(e.target.closest('button'))$('opslaan').hidden=false;});
+$('sc-test').onclick=async()=>{const r=$('r-sc');r.className='res';r.textContent='Bezig met ophalen bij Solcast…';
+  try{const x=await api('/api/solcast/test',{sleutel:$('k-sc-sleutel').value,sites:$('k-sc-sites').value});r.className='res '+(x.ok?'ok':'bad');r.textContent=x.tekst;if(x.ok)$('opslaan').hidden=false;}
+  catch(e){r.className='res bad';r.textContent=e.message;}};
 $('tibbertest').onclick=async()=>{const r=$('r-tibber');r.className='res';r.textContent='Bezig met controleren…';
   try{const x=await api('/api/tibber/test',{token:$('k-tibber').value});r.className='res '+(x.ok?'ok':'bad');r.textContent=x.tekst;
     if(x.ok&&$('k-lev').value!=='tibber'){$('k-lev').value='tibber';$('k-lev').dispatchEvent(new Event('change'));}

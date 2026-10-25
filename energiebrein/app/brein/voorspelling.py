@@ -66,6 +66,8 @@ class Voorspelling:
         except Exception:
             pass
         self.weer = Weer(cfg)
+        from .solcast import Solcast
+        self.solcast = Solcast(cfg, data)
         self.ai_huis = HuisAI(data / "ai_huis.pkl", "huis_kwh", "huis")
         self.ai_wp = HuisAI(data / "ai_warmtepomp.pkl", "wp_kwh", "warmtepomp")
         self._ai_cache: dict[datetime, float] = {}
@@ -82,6 +84,16 @@ class Voorspelling:
     async def ververs_zon(self) -> None:
         loc = self.cfg["locatie"]
         reeks: dict[datetime, float] = defaultdict(float)
+        # Solcast gaat voor als die is ingesteld (nauwkeuriger, kent je eigen dak). Lukt het niet, dan forecast.solar.
+        if self.solcast.aan:
+            try:
+                from .net import sessie
+                async with sessie() as s:
+                    if await self.solcast.ververs(s):
+                        self.zon_w, self.zon_bron = dict(self.solcast.reeks), "solcast"
+                        return
+            except Exception as e:
+                log.warning("Solcast niet beschikbaar (%s), ik gebruik forecast.solar", e)
         try:
             from .net import sessie
             async with sessie() as s:
@@ -100,7 +112,7 @@ class Voorspelling:
             self.zon_bron = "model"
 
     def zon_kwh(self, t: datetime) -> float:
-        if self.zon_bron == "forecast.solar" and self.zon_w:
+        if self.zon_bron in ("forecast.solar", "solcast") and self.zon_w:
             # gemiddelde van het vermogen aan begin en eind van het kwartier, lineair geïnterpoleerd
             w = (self._interp(t) + self._interp(t + timedelta(minutes=15))) / 2
             return w / 1000 * 0.25 * self.zon_correctie
@@ -223,7 +235,7 @@ class Voorspelling:
         return wp["jaarverbruik_kwh"] * STOOK[m] / dagen
 
     def status(self) -> dict:
-        return {"zon_bron": self.zon_bron, "leerdagen": self.leerdagen,
+        return {"zon_bron": self.zon_bron, "leerdagen": self.leerdagen, "solcast": self.solcast.status(),
                 "geleerd": bool(self._huisprofiel) or self.ai_huis.actief,
                 "zon_correctie": round(self.zon_correctie, 2), "weer_bron": self.weer.bron,
                 "temp_nu": round(self.weer.op(datetime.now(timezone.utc)), 1),

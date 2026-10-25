@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.7.1
+
+- **Solcast als zonvoorspelling.** Bij Koppelen → Zonnepanelen vul je je Solcast API-sleutel en het resource-ID van je rooftop site in (de hele API-link plakken mag ook). Het brein gebruikt dan Solcast in plaats van forecast.solar. Zuinig met de 10 gratis aanvragen per dag: hooguit 8, om de paar uur, niet 's nachts, en de laatste voorspelling blijft bewaard na een herstart. Lukt Solcast niet, dan valt hij terug op forecast.solar.
+
 ## 1.7.0
 
 - **Voorspeld en echt.** Onder Plan → Gemeten zie je nu per dag, 7 of 30 dagen wat het brein vooraf verwachtte (gestippeld) naast wat je huis en je panelen echt deden (doorgetrokken), met hoeveel de voorspelling ernaast zat. Het brein bewaart daarvoor de voorspelling van minstens een uur van tevoren. De vergelijking begint vanaf deze versie; oudere dagen hebben nog geen bewaarde voorspelling.
