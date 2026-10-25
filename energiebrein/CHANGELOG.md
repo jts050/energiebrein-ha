@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.7.0
+
+- **Voorspeld en echt.** Onder Plan → Gemeten zie je nu per dag, 7 of 30 dagen wat het brein vooraf verwachtte (gestippeld) naast wat je huis en je panelen echt deden (doorgetrokken), met hoeveel de voorspelling ernaast zat. Het brein bewaart daarvoor de voorspelling van minstens een uur van tevoren. De vergelijking begint vanaf deze versie; oudere dagen hebben nog geen bewaarde voorspelling.
+
 ## 1.6.10
 
 - Op een tablet (staand) is het stroomschema op Thuis groter en staat het in het midden. De lijst "Wat de accu straks doet" en de prijsgrafiek gebruiken de hele breedte.

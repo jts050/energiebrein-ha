@@ -607,6 +607,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 .klemtest-uit{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:8px 0;font-size:14px}.klemtest-uit.goed{border-color:var(--good)}.klemtest-uit.fout{border-color:var(--bad)}.klemtest-uit,.klemtest-uit li,.klemtest-uit b{color:var(--ink)}.klemtest-uit ul{margin:6px 0 0;padding-left:18px}.klemtest-uit li{margin:3px 0}
 /* tablet staand: schema groter en in het midden, lijsten over de hele breedte */
 @media (min-width:600px) and (max-width:980px){.stroom svg{max-width:min(100%,620px);margin:0 auto}.straks-sectie,.spark-sectie{max-width:none}}
+.vg-kop{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:14px 0 2px;font-size:14px}.vg-kop span{color:var(--muted);font-size:13px}
 </style>
 </head>
 <body>
@@ -678,6 +679,11 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
           <div class="gm-grafiek" id="gm-soc"></div>
         </div>
         <div class="blok"><h2>Totaal in deze periode</h2><div class="cijfers" id="gm-totaal"></div></div>
+        <div class="blok vg"><h2>Voorspeld en echt</h2>
+          <p class="note">Wat het brein een uur of langer van tevoren verwachtte (gestippeld) naast wat er echt gebeurde (doorgetrokken).</p>
+          <div class="vg-kop"><b>Huisverbruik</b><span id="vg-huis-tekst"></span></div><div class="gm-grafiek" id="vg-huis"></div>
+          <div class="vg-kop"><b>Zon</b><span id="vg-zon-tekst"></span></div><div class="gm-grafiek" id="vg-zon"></div>
+        </div>
       </div>
       <div id="planblok">
       <div class="blok">
@@ -1669,7 +1675,9 @@ async function laadGemeten(){
   const uren=Math.ceil((nu-van)/36e5)+1;
   try{const r=await api(`/api/geschiedenis?uren=${uren}`);GM.van=van;GM.tot=tot;
     GM.plan=[];if(GM.dagen===0){try{const pl=await api('/api/plan');GM.plan=pl.kwartieren.filter(k=>new Date(k.start)<tot);}catch(e){}}
-    GM.rijen=r.filter(x=>{const t=new Date(x.start);return t>=van&&t<tot;});tekenGemeten();}
+    GM.rijen=r.filter(x=>{const t=new Date(x.start);return t>=van&&t<tot;});tekenGemeten();
+    try{const v=await api(`/api/voorspeld?uren=${uren}`);GM.voorspeld=v.filter(x=>{const t=new Date(x.start);return t>=van&&t<tot;});}catch(e){GM.voorspeld=[];}
+    tekenVoorspeld();}
   catch(e){$('gm-vermogen').innerHTML=`<p class="note">${esc(e.message)}</p>`;}}
 function tekenGemeten(){
   const el=$('gm-vermogen'),W=Math.max(el.clientWidth||700,300),H=Math.round(Math.min(320,Math.max(220,W*0.36))),L=44,R=10,T=12,B=26;
@@ -1743,7 +1751,42 @@ function tekenGemeten(){
     <div class="cijfer"><b>${eur(kosten)}</b><span>Stroomkosten</span></div>
     <div class="cijfer goed"><b>${eur(zonder-kosten)}</b><span>Bespaard door de accu</span></div>`;
 }
-let RSZ=null;window.addEventListener('resize',()=>{clearTimeout(RSZ);RSZ=setTimeout(()=>{if(!$('gemeten').hidden)tekenGemeten();if(P&&!$('v-plan').hidden&&!$('planblok').hidden)renderPlan();},150);});
+function tekenVoorspeld(){
+  const V=GM.voorspeld||[],E=GM.rijen||[];
+  // per uur (of grover bij lange periodes): per kwartier schommelt het verbruik te veel om eerlijk te vergelijken
+  const stap=GM.dagen>=30?240:60,sl=t=>Math.floor(new Date(t).getTime()/(stap*6e4));
+  const bak=(lijst,veld)=>{const m=new Map();for(const x of lijst){const k=sl(x.start),b=m.get(k)||{s:0,n:0};b.s+=x[veld]||0;b.n++;m.set(k,b);}return m;};
+  const nu=Date.now();
+  for(const [veld,id,kleur] of [['huis_kwh','vg-huis','var(--ink)'],['zon_kwh','vg-zon','var(--zon)']]){
+    const el=$(id),tekst=$(id+'-tekst'),bv=bak(V,veld),be=bak(E.filter(x=>x.n>=3),veld);
+    if(!V.length){el.innerHTML='';tekst.textContent='';continue;}
+    const W=Math.max(el.clientWidth||700,300),H=150,L=44,R=10,T=10,B=24;
+    const x0=GM.van.getTime(),x1=GM.tot.getTime(),X=t=>L+(t-x0)/(x1-x0)*(W-L-R);
+    const kw=(b,k)=>b.s/(b.n*0.25);                       // gemiddeld vermogen in dat uur
+    const pv=[...bv.entries()].sort((a,b)=>a[0]-b[0]).map(([k,b])=>({t:k*stap*6e4,v:kw(b)}));
+    const pe=[...be.entries()].sort((a,b)=>a[0]-b[0]).map(([k,b])=>({t:k*stap*6e4,v:kw(b)}));
+    let mx=0.5;for(const p of pv.concat(pe))mx=Math.max(mx,p.v);mx=mx<=2?Math.ceil(mx*2)/2:Math.ceil(mx);
+    const Y=v=>T+(mx-v)/mx*(H-T-B),midden=stap*3e4;
+    const lijn=(pt)=>pt.map((p,i)=>`${!i||p.t-pt[i-1].t>stap*6e4*1.5?'M':'L'}${X(p.t+midden).toFixed(1)},${Y(p.v).toFixed(1)}`).join('');
+    let g=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Voorspeld en echt">`;
+    for(const v of [0,mx/2,mx])g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" ${v?'stroke-dasharray="2 4"':''}/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end">${nf(v,v%1?1:0)}${v===mx?' kW':''}</text>`;
+    const dagen=(x1-x0)/864e5;
+    if(dagen<=1.01){const hs=W<520?6:3;for(let h=0;h<=24;h+=hs)g+=`<text x="${X(x0+h*36e5)}" y="${H-6}" text-anchor="${h===0?'start':h>=24?'end':'middle'}">${String(h%24).padStart(2,'0')}:00</text>`;}
+    else{const st=dagen>10?(W<520?10:5):(W<520?2:1);for(let d=0;d<dagen;d+=st){const t=new Date(x0+d*864e5+432e5);g+=`<text x="${X(t.getTime())}" y="${H-6}" text-anchor="middle">${t.toLocaleDateString('nl-NL',{weekday:dagen<=8?'short':undefined,day:'numeric',month:dagen>8?'short':undefined})}</text>`;}}
+    if(nu>x0&&nu<x1)g+=`<line x1="${X(nu)}" x2="${X(nu)}" y1="${T}" y2="${H-B}" stroke="var(--faint)" stroke-dasharray="3 3"/>`;
+    g+=`<path d="${lijn(pe)}" fill="none" stroke="${kleur}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    g+=`<path d="${lijn(pv)}" fill="none" stroke="${kleur}" stroke-width="2" stroke-dasharray="4 4" opacity=".75"/>`;
+    el.innerHTML=g+'</svg>';
+    // hoe goed klopte het: alleen uren die voorbij zijn en waarvoor beide er zijn
+    let fout=0,echt=0,som_v=0;
+    for(const [k,b] of be){const v=bv.get(k);if(!v||(k+1)*stap*6e4>nu)continue;fout+=Math.abs(v.s-b.s);echt+=b.s;som_v+=v.s;}
+    tekst.textContent=echt>0.5?`echt ${nf(echt,1)} kWh, voorspeld ${nf(som_v,1)} kWh · per uur gemiddeld ${Math.round(fout/echt*100)}% ernaast`
+      :(veld==='zon_kwh'?'nog te weinig zon in deze periode om te vergelijken':'nog te weinig om te vergelijken');
+  }
+  const leeg=!V.length;
+  $('vg-huis-tekst').textContent=leeg?'De voorspellingen worden bewaard vanaf deze versie. Over een paar uur verschijnt hier de eerste vergelijking.':$('vg-huis-tekst').textContent;
+}
+let RSZ=null;window.addEventListener('resize',()=>{clearTimeout(RSZ);RSZ=setTimeout(()=>{if(!$('gemeten').hidden){tekenGemeten();tekenVoorspeld();}if(P&&!$('v-plan').hidden&&!$('planblok').hidden)renderPlan();},150);});
 setInterval(()=>{if(!$('gemeten').hidden&&!$('v-plan').hidden&&GM.dagen===0)laadGemeten();},60000);
 
 /* ---------- logboek ---------- */

@@ -115,6 +115,10 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
     async def geschiedenis(uren: int = 24):
         return B().gesch.rijen(datetime.now(timezone.utc) - timedelta(hours=uren))
 
+    @app.get("/api/voorspeld")
+    async def voorspeld(uren: int = 24):
+        return B().gesch.voorspellingen(datetime.now(timezone.utc) - timedelta(hours=uren))
+
     @app.post("/api/bediening")
     async def bediening(k: Keuze):
         if k.apparaat not in KEUZES or k.stand not in KEUZES[k.apparaat]:

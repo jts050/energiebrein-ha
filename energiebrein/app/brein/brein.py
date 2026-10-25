@@ -118,6 +118,12 @@ class Brein:
                          zon_kwh=self.voorsp.zon_kwh(t), huis_kwh=self.voorsp.huis_kwh(t))
             self.voorsp.bewaar(t, k.zon_kwh)
             kw.append(k)
+        # De voorspelling van minstens een uur van tevoren bewaren, om later te vergelijken met wat het huis echt deed.
+        # (Een voorspelling voor het lopende kwartier is geen kunst meer.)
+        try:
+            self.gesch.bewaar_voorspelling([(k.start, k.huis_kwh, k.zon_kwh) for k in kw if k.start - nu >= timedelta(hours=1)])
+        except Exception:
+            log.exception("Voorspelling bewaren mislukt")
         if kw:  # het lopende kwartier is al deels voorbij
             deel = 1 - (nu - kw[0].start).total_seconds() / 900
             kw[0].zon_kwh *= deel

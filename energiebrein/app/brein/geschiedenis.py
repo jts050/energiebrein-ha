@@ -20,8 +20,28 @@ class Geschiedenis:
         for v in VELDEN:   # oudere databases bijwerken
             if v not in bestaand:
                 self.db.execute(f"ALTER TABLE kwartier ADD COLUMN {v} REAL")
+        # Wat het brein vooraf voorspelde, om later naast de echte metingen te leggen (Plan → Gemeten).
+        self.db.execute("CREATE TABLE IF NOT EXISTS voorspeld (start TEXT PRIMARY KEY, huis_kwh REAL, zon_kwh REAL)")
         self.db.commit()
         self._lopend: dict | None = None
+
+    def bewaar_voorspelling(self, rijen: list[tuple[datetime, float, float]]) -> None:
+        """Per kwartier de voorspelling van huisverbruik en zon. Een latere voorspelling (dichterbij) vervangt de vorige."""
+        if not rijen:
+            return
+        with self.lock:
+            self.db.executemany("INSERT OR REPLACE INTO voorspeld (start, huis_kwh, zon_kwh) VALUES (?, ?, ?)",
+                                [(t.astimezone(timezone.utc).isoformat(), h, z) for t, h, z in rijen])
+            grens = (datetime.now(timezone.utc) - timedelta(days=120)).isoformat()
+            self.db.execute("DELETE FROM voorspeld WHERE start < ?", (grens,))
+            self.db.commit()
+
+    def voorspellingen(self, van: datetime, tot: datetime | None = None) -> list[dict]:
+        tot = tot or datetime.now(timezone.utc) + timedelta(days=2)
+        with self.lock:
+            cur = self.db.execute("SELECT start, huis_kwh, zon_kwh FROM voorspeld WHERE start >= ? AND start < ? ORDER BY start",
+                                  (van.astimezone(timezone.utc).isoformat(), tot.astimezone(timezone.utc).isoformat()))
+            return [{"start": s, "huis_kwh": h, "zon_kwh": z} for s, h, z in cur.fetchall()]
 
     def meet(self, m: Meting, inkoop: float, teruglever: float, interval_s: float, beurs: float | None = None) -> None:
         """Telt een meting op bij het lopende kwartier."""
