@@ -26,6 +26,8 @@ class Brein:
         self.gesch = Geschiedenis(data_map(cfg) / "geschiedenis.db")
         self.prijzen = Prijzen(cfg)
         self.voorsp = Voorspelling(cfg, self.gesch)
+        from .conditie import Conditie
+        self.conditie = Conditie(cfg, self.gesch, data_map(cfg))
         self.planner = Planner(cfg)
         self.planner.temp = self.voorsp.weer.op if hasattr(self.voorsp, "weer") else None
         from .licentie import Licentie
@@ -78,6 +80,7 @@ class Brein:
         await self.voorsp.weer.ververs()
         self.voorsp.leer(train=True)
         self.meting = await self.huis.lees()
+        self._bereken_conditie()
         self.maak_plan()
         self._taken = [asyncio.create_task(self._regel_lus()), asyncio.create_task(self._plan_lus()),
                        asyncio.create_task(self._data_lus()), asyncio.create_task(self._licentie_lus()),
@@ -132,8 +135,83 @@ class Brein:
         self._zet_autodoel(nu)
         auto = AutoStatus(verbonden=bool(m and m.auto_verbonden), geladen_kwh=self.auto_geladen(m))
         self.planner.ondergrens = self._omvormer_grens()
+        self.planner.storm = self.stormkwartieren(kw)
         self.plan = self.planner.maak(kw, m.accu_soc if m else 50.0, self.bed, auto, self.voorsp.wp_dag_kwh)
         log.info("Nieuw plan: %d kwartieren, verwachte besparing %s", len(kw), self.plan["samenvatting"].get("besparing"))
+        try:
+            self._meld_bijzondere_prijzen(kw)
+        except Exception:
+            log.exception("Melding over bijzondere prijzen mislukt")
+
+    def stormkwartieren(self, kw: list) -> dict:
+        """Met de stormstand aan: de kwartieren vanaf 2 uur vóór tot het eind van onweer of zware windstoten."""
+        if not self.cfg["accu"].get("stormstand"):
+            return {}
+        storm = self.voorsp.weer.storm
+        uit = {}
+        for k in kw:
+            for u, reden in storm.items():
+                if u - timedelta(hours=2) <= k.start < u + timedelta(hours=1):
+                    uit[k.start] = reden
+                    break
+        if uit:
+            eerste = min(uit)
+            sleutel = f"storm-{eerste.astimezone():%Y-%m-%d}"
+            if sleutel not in getattr(self, "_prijs_gemeld", set()):
+                self._prijs_gemeld = getattr(self, "_prijs_gemeld", set()) | {sleutel}
+                tekst = (f"{uit[eerste].capitalize()} verwacht rond {eerste.astimezone():%H:%M}. De accu wordt vooraf vol geladen en "
+                         "vol gehouden, voor als de stroom uitvalt.")
+                self.logboek.schrijf("besluit", tekst, "omvormer")
+                self.telefoon.meld(sleutel, "Energiebrein: stormstand", tekst)
+        return uit
+
+    @staticmethod
+    def prijsvensters(kw: list, nu: datetime) -> list[dict]:
+        """Aaneengesloten stukken in de komende 24 uur waarin je geld krijgt voor stroom (negatieve inkoopprijs), of waarin
+        terugleveren geld kost (negatieve terugleverprijs)."""
+        uit, cur = [], None
+        for k in kw:
+            if k.start > nu + timedelta(hours=24):
+                break
+            soort = "betaald" if k.inkoop < 0 else "terug_kost" if k.teruglever < 0 else None
+            if cur and (soort != cur["soort"] or k.start != cur["tot"]):
+                uit.append(cur)
+                cur = None
+            if soort:
+                if not cur:
+                    cur = {"soort": soort, "van": k.start, "tot": k.start, "uiterste": 0.0}
+                cur["tot"] = k.start + timedelta(minutes=15)
+                cur["uiterste"] = max(cur["uiterste"], -(k.inkoop if soort == "betaald" else k.teruglever))
+        if cur:
+            uit.append(cur)
+        return [v for v in uit if v["tot"] - v["van"] >= timedelta(minutes=30)]
+
+    def _meld_bijzondere_prijzen(self, kw: list):
+        """Eén keer per venster een melding op je telefoon (en in het logboek), zodat je wasmachine en vaatwasser kunt inplannen."""
+        nu = datetime.now(timezone.utc)
+        gemeld = getattr(self, "_prijs_gemeld", set())
+        self._prijs_gemeld = gemeld
+        for v in self.prijsvensters(kw, nu):
+            sleutel = f"{v['soort']}-{v['van'].isoformat()}"
+            if sleutel in gemeld:
+                continue
+            gemeld.add(sleutel)
+            van, tot = v["van"].astimezone(), v["tot"].astimezone()
+            dag = "vandaag" if van.date() == nu.astimezone().date() else "morgen"
+            tijd = f"{dag} {van:%H:%M}–{tot:%H:%M}"
+            if v["soort"] == "betaald":
+                titel = "Straks krijg je geld voor stroom"
+                tekst = (f"{tijd.capitalize()} krijg je tot {self._e(v['uiterste'])} per kWh toe als je stroom gebruikt. De accu laadt dan "
+                         "vol uit het net. Zet in die tijd ook de vaatwasser, wasmachine of droger aan, of laad de auto.")
+            else:
+                titel = "Straks kost terugleveren geld"
+                tekst = (f"{tijd.capitalize()} kost terugleveren tot {self._e(v['uiterste'])} per kWh. De zon gaat eerst de accu in"
+                         + (" en de panelen worden zo nodig afgetopt" if self.cfg["omvormer"].get("aftoppen_bij_negatieve_prijs", True) else "")
+                         + ". Gebruik in die tijd zelf zoveel mogelijk stroom: wasmachine, vaatwasser, auto laden.")
+            self.logboek.schrijf("besluit", f"{titel}: {tekst}", "contract")
+            self.telefoon.meld(sleutel, f"Energiebrein: {titel}", tekst)
+        if len(gemeld) > 50:
+            self._prijs_gemeld = set(sorted(gemeld)[-20:])
 
     def _omvormer_grens(self) -> float | None:
         """Ondergrens die de omvormer zelf hanteert (bij GoodWe de ontlaaddiepte), als hij die meldt."""
@@ -656,6 +734,7 @@ class Brein:
                 await self.voorsp.ververs_zon()
                 await self.voorsp.weer.ververs()
                 self.voorsp.leer()
+                self._bereken_conditie()
                 self.herplan()
             except Exception:
                 log.exception("Data verversen mislukt")
@@ -751,7 +830,14 @@ class Brein:
         if self.voorsp.zon_bron == "model" and not self.huis.sim:
             uit.append({"ernst": "info", "apparaat": "zon", "titel": "Geen zonvoorspelling",
                         "uitleg": "De weersvoorspelling voor je panelen is niet bereikbaar; het brein gebruikt het maandgemiddelde.", "actie": ""})
+        uit.extend(self.conditie.storingen())
         return uit
+
+    def _bereken_conditie(self):
+        try:
+            self.conditie.bereken(getattr(self.huis.omvormer, "bms", None))
+        except Exception:
+            log.exception("Conditie van de accu uitrekenen mislukt")
 
     def waarde_lading(self) -> float:
         """Wat een kWh die nu in de accu zit straks ongeveer waard is: de gemiddelde inkoopprijs van het komende etmaal,
@@ -778,7 +864,7 @@ class Brein:
                                     "min_ingesteld": float(self.cfg["accu"]["min_soc"]), "min_omvormer": self._omvormer_grens(),
                                     "terugverkopen": mag_verkopen(self.cfg["accu"]),
                                     "min_winst": float(self.cfg["accu"].get("min_winst_per_kwh", 0.0) or 0.0)},
-                "klemtest": self.klemtest.dict(),
+                "klemtest": self.klemtest.dict(), "conditie": self.conditie.laatst,
                 "fasen": {"p1": getattr(self.huis.p1, "fasen", None), "omvormer": getattr(self.huis.omvormer, "meter_fasen", None)},
                 "prijsbron": self.prijzen.bron, "simulatie": bool(self.huis.sim),
                 "apparaten": self.huis.onderdelen(), "fouten": self.huis.fouten, "meldingen": self.huis.meldingen,

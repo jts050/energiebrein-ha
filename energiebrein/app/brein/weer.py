@@ -22,11 +22,33 @@ def normaal(t: datetime) -> float:
     return seizoen + 4.0 * math.cos((uur - 15) / 24 * 2 * math.pi)
 
 
+ONWEER = {95, 96, 99}         # WMO-weercodes: onweer, onweer met hagel
+WINDSTOOT_KMU = 75            # vanaf hier (code oranje-achtig) kan de stroom uitvallen
+
+
+def stormuren(h: dict, nu: datetime) -> dict[datetime, str]:
+    """Uren in de verwachting met onweer of zware windstoten."""
+    uit = {}
+    codes, stoten = h.get("weather_code") or [], h.get("wind_gusts_10m") or []
+    for i, t in enumerate(h.get("time") or []):
+        u = datetime.fromisoformat(t).replace(tzinfo=timezone.utc)
+        if u < nu - timedelta(hours=1):
+            continue
+        code = codes[i] if i < len(codes) else None
+        stoot = stoten[i] if i < len(stoten) else None
+        if code in ONWEER:
+            uit[u] = "onweer"
+        elif stoot is not None and stoot >= WINDSTOOT_KMU:
+            uit[u] = f"zware windstoten ({stoot:.0f} km/u)"
+    return uit
+
+
 class Weer:
     def __init__(self, cfg: dict):
         self.loc = cfg["locatie"]
         self.temp: dict[datetime, float] = {}   # UTC uur → °C
         self.bron = "normaal"
+        self.storm: dict[datetime, str] = {}     # UTC uur → "onweer" of "zware windstoten (90 km/u)", alleen de verwachting
         self.bestand = data_map(cfg) / "weer.json"         # bewaart gemeten temperaturen, zodat de AI er langer van kan leren
         try:
             self.temp = {datetime.fromisoformat(k): v for k, v in json.loads(self.bestand.read_text()).items()}
@@ -36,7 +58,7 @@ class Weer:
             pass
 
     async def ververs(self):
-        params = {"latitude": self.loc["breedte"], "longitude": self.loc["lengte"], "hourly": "temperature_2m",
+        params = {"latitude": self.loc["breedte"], "longitude": self.loc["lengte"], "hourly": "temperature_2m,weather_code,wind_gusts_10m",
                   "past_days": 60, "forecast_days": 3, "timezone": "UTC"}
         try:
             from .net import sessie
@@ -48,6 +70,7 @@ class Weer:
             h = d["hourly"]
             self.temp.update({datetime.fromisoformat(t).replace(tzinfo=timezone.utc): v
                               for t, v in zip(h["time"], h["temperature_2m"]) if v is not None})
+            self.storm = stormuren(h, datetime.now(timezone.utc))
             grens = datetime.now(timezone.utc) - timedelta(days=400)
             self.temp = {k: v for k, v in self.temp.items() if k > grens}
             self.bron = "Open-Meteo"

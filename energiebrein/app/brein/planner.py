@@ -53,6 +53,7 @@ class Planner:
     def __init__(self, cfg: dict):
         self.cfg = cfg
         self.ondergrens: float | None = None   # ondergrens die de omvormer zelf hanteert (%), als die hoger is
+        self.storm: dict = {}                  # kwartier-start → reden (onweer, windstoten): dan de accu vol houden
         self._e_start = 0.0
         self._eindwaarde = 0.0
 
@@ -220,7 +221,8 @@ class Planner:
         eta = math.sqrt(c["rendement"])
         # Per geladen kWh: slijtage plus de winst die het minstens moet opleveren. Zo laadt en ontlaadt de accu niet
         # voor een paar cent verschil, waar na laadverlies, slijtage en een verkeerde voorspelling niets van overblijft.
-        slijt = float(c.get("slijtage_per_kwh", 0.02)) + max(float(c.get("min_winst_per_kwh", 0.0) or 0.0), 0.0)
+        slijtage = float(c.get("slijtage_per_kwh", 0.02))
+        min_winst = max(float(c.get("min_winst_per_kwh", 0.0) or 0.0), 0.0)
         verkopen = mag_verkopen(c)
         zon_eerst = zon_in_accu(c)
         N = max(10, min(400, int((hi - lo) / 0.05)))
@@ -241,6 +243,8 @@ class Planner:
             d = deltas * stap
             g = netto + np.where(d > 0, d / eta, d * eta)                     # netstroom per keuze
             terug = 0.0 if (aftoppen_mag and k.teruglever < 0) else k.teruglever
+            # Krijg je geld voor stroom (negatieve inkoopprijs), dan geen extra winstdrempel: elke kWh erin levert al op.
+            slijt = slijtage + (min_winst if k.inkoop >= 0 else 0.0)
             kost = np.where(g > 0, g * k.inkoop, g * terug) + np.where(d > 0, d * slijt, 0.0)   # per keuze, incl. slijtage
             doel = idx[:, None] + deltas[None, :]                              # (N+1, keuzes)
             geldig = (doel >= 0) & (doel <= N)
@@ -251,6 +255,11 @@ class Planner:
                 # zonne-overschot: niet terugleveren zolang de accu het kan opnemen (vol laden of de accu zit vol)
                 geldig &= (g >= -1e-9)[None, :] | (deltas == up)[None, :] | (doel >= N)
             totaal = np.where(geldig, kost[None, :] + V[np.clip(doel, 0, N)], np.inf)
+            if k.start in self.storm:
+                # Stormstand: elke kWh onder (bijna) vol kost in dit kwartier € 1. Zo laadt het plan vooraf vol en houdt het
+                # de lading vast, maar lukt dat niet helemaal (te weinig tijd), dan loopt het plan niet vast.
+                tekort = np.maximum(0, int(N * 0.95) - np.clip(doel, 0, N)) * stap
+                totaal = totaal + tekort * 1.0
             # bij gelijke kosten: liever niets doen (minder slijtage)
             totaal += np.abs(deltas)[None, :] * 1e-6
             beste = np.argmin(totaal, axis=1)
@@ -282,7 +291,11 @@ class Planner:
         for idx, k in enumerate(kw):
             over = k.zon_kwh - k.huis_kwh - k.wp_kwh - k.auto_kwh
             later = max((x.inkoop for x in kw[idx:idx + 48]), default=k.inkoop)
-            if k.aftoppen:
+            if k.start in self.storm and k.accu_actie != "ontladen":
+                k.reden = f"{self.storm[k.start].capitalize()} verwacht: de accu blijft vol voor als de stroom uitvalt."
+            elif k.accu_actie == "laden" and k.inkoop < 0:
+                k.reden = f"Je krijgt nu geld voor stroom ({_euro(-k.inkoop)} per kWh): de accu laadt uit het net en je wordt ervoor betaald."
+            elif k.aftoppen:
                 k.reden = f"Terugleveren kost nu geld ({_euro(k.teruglever)}), panelen worden afgetopt."
             elif k.accu_actie == "laden" and over >= 0.8 * k.accu_kwh / eta:
                 k.reden = "Zonne-overschot gaat de accu in in plaats van het net op."

@@ -1,5 +1,11 @@
 # Wat er nieuw is
 
+## 1.8.0
+
+- **Conditie van de accu** op Thuis: gezondheid volgens de accu zelf, de gemeten capaciteit (hoeveel kWh er echt in past), het aantal keer dat de accu helemaal rond is geweest, het rendement, de temperatuur en het aantal modules. Per maand wordt de capaciteit bewaard, zodat je ziet of de accu slijt. Een melding als een module wegvalt, de capaciteit onder 80% komt of de accu erg warm of koud is.
+- **Negatieve prijzen benutten.** Krijg je geld voor stroom, dan laadt de accu zonder winstdrempel vol uit het net. Je krijgt vooraf een melding op je telefoon (en in het logboek) wanneer je geld krijgt voor stroom of wanneer terugleveren geld kost, zodat je de wasmachine, vaatwasser of auto in die tijd kunt laten draaien.
+- **Stormstand** (Koppelen → Slim handelen, standaard uit): bij onweer of zware windstoten in de weersverwachting laadt het brein de accu een paar uur van tevoren vol en houdt hem vol, voor als de stroom uitvalt. Alleen zinvol met een noodstroomgroep op de omvormer.
+
 ## 1.7.1
 
 - **Solcast als zonvoorspelling.** Bij Koppelen → Zonnepanelen vul je je Solcast API-sleutel en het resource-ID van je rooftop site in (de hele API-link plakken mag ook). Het brein gebruikt dan Solcast in plaats van forecast.solar. Zuinig met de 10 gratis aanvragen per dag: hooguit 8, om de paar uur, niet 's nachts, en de laatste voorspelling blijft bewaard na een herstart. Lukt Solcast niet, dan valt hij terug op forecast.solar.

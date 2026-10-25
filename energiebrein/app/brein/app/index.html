@@ -608,6 +608,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 /* tablet staand: schema groter en in het midden, lijsten over de hele breedte */
 @media (min-width:600px) and (max-width:980px){.stroom svg{max-width:min(100%,620px);margin:0 auto}.straks-sectie,.spark-sectie{max-width:none}}
 .vg-kop{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:14px 0 2px;font-size:14px}.vg-kop span{color:var(--muted);font-size:13px}
+.cijfer.slecht b{color:var(--bad)}
 </style>
 </head>
 <body>
@@ -657,6 +658,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         <div class="nu-rechts">
           <div class="sectie"><h2>Apparaten</h2><ul class="rijen" id="rijen"></ul></div>
           <div class="sectie"><h2>Vandaag</h2><div class="cijfers" id="vandaag"></div></div>
+          <div class="sectie" id="conditie-sectie" hidden><h2>Conditie van de accu</h2><div class="cijfers" id="conditie"></div><p class="note" id="conditie-uitleg"></p></div>
           <div class="sectie opb"><h2>Wat het je oplevert</h2><div id="opbrengst"><p class="klein">Na een dag meten zie je hier wat zon, accu en het brein je opleveren.</p></div></div>
           <div class="sectie"><h2>Wat het brein over je huis weet</h2><div class="ai" id="ai"></div></div>
         </div>
@@ -797,6 +799,8 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         <h3 class="tussen" style="margin-top:14px">Slim handelen</h3>
         <label class="chk"><input type="checkbox" id="k-zon-accu"> Zonne-overschot altijd eerst in de accu (zolang die ruimte heeft)</label>
         <label class="chk"><input type="checkbox" id="k-verkopen"> De accu mag stroom aan het net verkopen</label>
+        <label class="chk"><input type="checkbox" id="k-storm"> Accu vol houden bij onweer of zware storm (voor als de stroom uitvalt)</label>
+        <p class="note">Alleen zinvol als er een noodstroomgroep (backup) op de omvormer zit. Het brein laadt de accu dan een paar uur van tevoren vol, ook als dat wat kost.</p>
         <div class="f3"><label class="f">Minimale winst per kWh (€)<input id="k-accu-winst" type="number" step="0.01" min="0" max="1" placeholder="0,03"></label></div>
         <p class="note" id="k-handel-uitleg">Het brein laadt en ontlaadt de accu alleen als dat per kWh minstens dit bedrag oplevert, na laadverlies en slijtage. Zo pompt hij de accu niet rond voor een paar cent verschil. Zet verkopen uit als de accu alleen je eigen huis moet voeden; terugleveren komt dan alleen van de zon.</p>
         <label class="chk"><input type="checkbox" id="k-aftop"> Panelen aftoppen als terugleveren geld kost</label>
@@ -1110,8 +1114,25 @@ function renderSolcast(){const el=$('sc-stand');if(!el)return;const v=S.voorspel
   if(!sc.aan){el.textContent='';return;}
   const t=sc.opgehaald?new Date(sc.opgehaald).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}):null;
   el.textContent=(v.zon_bron==='solcast'?'In gebruik':'Nu niet in gebruik (forecast.solar)')+(t?` · laatst opgehaald om ${t}`:'')+` · ${sc.aanvragen_vandaag||0} aanvragen vandaag`+(sc.fout?` · ${sc.fout}`:'');}
+function renderConditie(){const c=S.conditie||{},sec=$('conditie-sectie');if(!sec)return;
+  if(!c||(c.soh==null&&c.cycli==null)){sec.hidden=true;return;}sec.hidden=false;
+  const cap=c.capaciteit,pct=cap&&c.capaciteit_ingesteld?Math.round(cap/c.capaciteit_ingesteld*100):null;
+  const vak=(w,t,kl='')=>`<div class="cijfer ${kl}"><b>${w}</b><span>${t}</span></div>`;
+  $('conditie').innerHTML=
+    vak(c.soh!=null?c.soh+'%':'–','Gezondheid volgens de accu',c.soh!=null&&c.soh<80?'slecht':'')+
+    vak(cap?`${nf(cap,1)} kWh`:'meet nog',cap?`Gemeten capaciteit (${pct}% van ${nf(c.capaciteit_ingesteld,0)} kWh)`:'Gemeten capaciteit',pct&&pct<80?'slecht':'')+
+    vak(c.cycli!=null?nf(c.cycli,1):'–','Keer helemaal rond geweest')+
+    vak(c.rendement?Math.round(c.rendement*100)+'%':'meet nog','Rendement van de accu zelf')+
+    (c.temperatuur!=null?vak(`${nf(c.temperatuur,0)} °C`,'Temperatuur',(c.temperatuur>=45||c.temperatuur<=0)?'slecht':''):'')+
+    (c.modules?vak(c.modules,'Modules',c.max_modules&&c.modules<c.max_modules?'slecht':''):'');
+  const m=Object.entries(c.maanden||{}).filter(([k,v])=>v.capaciteit);
+  const mnd=k=>new Date(k+'-01').toLocaleDateString('nl-NL',{month:'short',year:'2-digit'});
+  $('conditie-uitleg').textContent=(m.length>=2?'Capaciteit per maand: '+m.slice(-6).map(([k,v])=>`${mnd(k)} ${nf(v.capaciteit,1)} kWh`).join(' · ')+'. '
+    :'')+(cap?`Gemeten uit ${c.capaciteit_stukken} keer flink laden of ontladen. `:'De gemeten capaciteit verschijnt zodra de accu een paar keer minstens een kwart geladen of ontladen is. ')
+    +'De accu zelf meldt vaak jarenlang 100%; de gemeten capaciteit laat eerder zien of hij slijt.';
+}
 function renderStatus(){
-  renderFasen();renderSolcast();if(S.klemtest&&(S.klemtest.bezig||S.klemtest.klaar)&&!(KT&&(KT.bezig||KT.klaar)))renderKlemtest(S.klemtest);
+  renderFasen();renderSolcast();renderConditie();if(S.klemtest&&(S.klemtest.bezig||S.klemtest.klaar)&&!(KT&&(KT.bezig||KT.klaar)))renderKlemtest(S.klemtest);
   const m=S.meting,b=S.besluit||{},a=S.apparaten||{},v=S.voorspelling||{},ai=v.ai_huis||{};
   const st=(S.storingen||[]).filter(x=>x.ernst!=='info'), storing=st.length;
   $('railvoet').innerHTML=`<span><i class="stip ${S.simulatie?'warn':''}"></i>${S.simulatie?'Simulatie':'Je eigen huis'}</span>
@@ -1480,7 +1501,7 @@ async function laadInstellingen(){
   $('k-lev').value=LEV.leveranciers[c.prijzen.leverancier]?c.prijzen.leverancier:'anders';levInfo();
   const zet=(id,v)=>{$(id).value=v??'';};
   zet('k-omv-type',c.omvormer.type||'uit');zet('k-omv-host',c.omvormer.host);zet('k-mb-poort',c.omvormer.modbus_poort||502);zet('k-mb-unit',c.omvormer.modbus_unit??1);zet('k-gebr',c.omvormer.gebruiker);zet('k-ww',c.omvormer.wachtwoord);zet('k-serie',c.omvormer.serienummer);$('k-sturen').checked=!!c.omvormer.sturen;$('k-huismeter').checked=c.omvormer.meter_meet==='huis';$('k-p1regel').checked=c.omvormer.regel==='p1';zet('k-sleutel',(c.net.p1||{}).sleutel);zet('k-lp-host',c.laadpaal.host);zet('k-tibber',c.prijzen.tibber_token);zet('k-sc-sleutel',(c.zonvoorspelling||{}).solcast_sleutel);zet('k-sc-sites',(c.zonvoorspelling||{}).solcast_sites);$('k-aftop').checked=!!c.omvormer.aftoppen_bij_negatieve_prijs;
-  $('k-verkopen').checked=c.accu.terugverkopen!==false;$('k-zon-accu').checked=c.accu.zon_altijd_in_accu!==false;zet('k-accu-winst',c.accu.min_winst_per_kwh??0.03);
+  $('k-verkopen').checked=c.accu.terugverkopen!==false;$('k-zon-accu').checked=c.accu.zon_altijd_in_accu!==false;$('k-storm').checked=!!c.accu.stormstand;zet('k-accu-winst',c.accu.min_winst_per_kwh??0.03);
   if(c.omvormer.regel==='p1'||c.omvormer.meter_meet==='huis')document.querySelector('.extra.meet').open=true;
   zet('k-accu-cap',c.accu.capaciteit_kwh);const okw=+c.omvormer.vermogen_kw||Math.max(c.accu.max_laden_kw,c.accu.max_ontladen_kw,1);zet('k-omv-kw',okw);zet('k-accu-in',Math.round(c.accu.max_laden_kw/okw*100));zet('k-accu-uit',Math.round(c.accu.max_ontladen_kw/okw*100));zet('k-accu-min',c.accu.min_soc);zet('k-accu-max',c.accu.max_soc??100);accuKw();
   zet('k-p1-type',(c.net.p1||{}).type||'uit');zet('k-p1-host',(c.net.p1||{}).host);zet('k-maxkw',c.net.max_afname_kw);
@@ -1570,7 +1591,7 @@ $('kform').addEventListener('submit',async e=>{e.preventDefault();
     omvormer:{vermogen_kw:n('k-omv-kw'),type:$('k-omv-type').value,host:$('k-omv-host').value.trim(),modbus_poort:parseInt($('k-mb-poort').value)||502,modbus_unit:parseInt($('k-mb-unit').value)||1,sturen:$('k-sturen').checked,gebruiker:$('k-gebr').value.trim(),wachtwoord:$('k-ww').value,serienummer:$('k-serie').value.trim(),aftoppen_bij_negatieve_prijs:$('k-aftop').checked,meter_meet:$('k-huismeter').checked?'huis':'net',regel:$('k-p1regel').checked?'p1':'omvormer'},
     zonnepanelen:[...document.querySelectorAll('.vlak')].map(d=>({kwp:parseFloat(d.querySelector('.v-kwp').value)||0,hoek:parseFloat(d.querySelector('.v-hoek').value)||0,richting:parseFloat(d.querySelector('.v-richting').value)})),
     accu:{capaciteit_kwh:n('k-accu-cap'),max_laden_kw:Math.round(n('k-omv-kw')*(n('k-accu-in')||100))/100,max_ontladen_kw:Math.round(n('k-omv-kw')*(n('k-accu-uit')||100))/100,min_soc:n('k-accu-min'),max_soc:n('k-accu-max')||100,
-      min_winst_per_kwh:Number.isFinite(n('k-accu-winst'))?n('k-accu-winst'):0.03,terugverkopen:$('k-verkopen').checked,zon_altijd_in_accu:$('k-zon-accu').checked},
+      min_winst_per_kwh:Number.isFinite(n('k-accu-winst'))?n('k-accu-winst'):0.03,terugverkopen:$('k-verkopen').checked,zon_altijd_in_accu:$('k-zon-accu').checked,stormstand:$('k-storm').checked},
     laadpaal:{type:$('k-lp-type').value,host:$('k-lp-host').value.trim(),gebruiker:$('k-lp-gebr').value.trim(),wachtwoord:$('k-lp-ww').value,serienummer:$('k-lp-serie').value.trim(),fasen:parseInt($('k-lp-fasen').value),max_stroom_a:n('k-lp-a'),auto_accu_kwh:n('k-lp-auto')},
     warmtepomp:{type:$('k-wp-type').value,relais1:$('k-wp-r1').value.trim(),relais2:$('k-wp-r2').value.trim(),meter:$('k-wp-meter').value.trim(),vermogen_kw:n('k-wp-kw'),jaarverbruik_kwh:n('k-wp-jaar'),comfort_tijden:$('k-wp-comfort').value.split(/[,;]/).map(x=>x.trim().replace(/\s+/g,'').replace(/–/g,'-')).filter(x=>/^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(x)),blokkeer_uren_per_dag:n('k-wp-blok'),max_wacht_achter_elkaar_uur:n('k-wp-run'),niet_wachten_onder_c:n('k-wp-min')},
     huis:{jaarverbruik_kwh:n('k-huis')},
