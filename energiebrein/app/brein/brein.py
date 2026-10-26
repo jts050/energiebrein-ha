@@ -87,6 +87,9 @@ class Brein:
         self._taken = [asyncio.create_task(self._regel_lus()), asyncio.create_task(self._plan_lus()),
                        asyncio.create_task(self._data_lus()), asyncio.create_task(self._licentie_lus()),
                        asyncio.create_task(self._auto_lus())]
+        from .telefoon import luister
+        self._taken.append(asyncio.create_task(luister(self.knop_op_melding)))
+        self._gestart = True
 
     async def pas_licentie_toe(self):
         """Gratis versie: apparaten eenmalig terug naar normaal en daarna alleen nog uitlezen en adviseren."""
@@ -139,6 +142,12 @@ class Brein:
         self.planner.ondergrens = self._omvormer_grens()
         self.planner.storm = self.stormkwartieren(kw)
         self.plan = self.planner.maak(kw, m.accu_soc if m else 50.0, self.bed, auto, self.voorsp.wp_dag_kwh)
+        if getattr(self, "_auto_net_aan", False):
+            self._auto_net_aan = False
+            try:
+                self._meld_auto_aangesloten()
+            except Exception:
+                log.exception("Melding auto aangesloten mislukt")
         log.info("Nieuw plan: %d kwartieren, verwachte besparing %s", len(kw), self.plan["samenvatting"].get("besparing"))
         try:
             self._meld_bijzondere_prijzen(kw)
@@ -286,6 +295,41 @@ class Brein:
             uit["haalt_doel"] = False
         return uit
 
+    def _meld_auto_aangesloten(self):
+        """De auto is net aangesloten: op je telefoon kiezen tussen slim laden (goedkoopste uren en zon) en direct laden."""
+        a = self.auto_overzicht()
+        nodig = a["nog_kwh"] or a["gepland_kwh"]
+        k = self.huidig()
+        nu_prijs = k.inkoop if k else None
+        regels = []
+        if a["gepland_kwh"] > 0.3 and a["tot"]:
+            klaar = datetime.fromisoformat(a["tot"]).astimezone()
+            dag = "vandaag" if klaar.date() == datetime.now().astimezone().date() else "morgen" if klaar.date() == (datetime.now().astimezone() + timedelta(days=1)).date() else ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"][klaar.weekday()]
+            gem = a["kosten"] / a["gepland_kwh"]
+            regels.append(f"Slim laden: {self._k(a['gepland_kwh'])} kWh, klaar {dag} om {klaar:%H:%M}, ± {self._e(a['kosten'])} (gemiddeld {self._e(gem)} per kWh"
+                          + (f", {self._k(a['zon_kwh'])} kWh van de zon" if a["zon_kwh"] > 0.3 else "") + ").")
+        if nodig and nu_prijs is not None:
+            regels.append(f"Direct laden: ± {self._e(nodig * nu_prijs)} (nu {self._e(nu_prijs)} per kWh).")
+        if not regels:
+            regels.append("Kies hoe de auto moet laden.")
+        stand = {"auto": "slim", "nu": "direct", "zon": "alleen op zon", "stop": "gestopt"}.get(self.bed.laadpaal, self.bed.laadpaal)
+        tekst = " ".join(regels) + f" Nu ingesteld: {stand}."
+        self.logboek.schrijf("besluit", "Auto aangesloten. " + tekst, "laadpaal")
+        self.telefoon.meld("auto-aangesloten", "Energiebrein: auto aangesloten", tekst,
+                           acties=[("EB_LAAD_SLIM", "Slim laden"), ("EB_LAAD_NU", "Direct laden"), ("EB_LAAD_ZON", "Alleen zon")])
+
+    async def knop_op_melding(self, actie: str):
+        """Antwoord van een knop op een melding."""
+        stand = {"EB_LAAD_SLIM": "auto", "EB_LAAD_NU": "nu", "EB_LAAD_ZON": "zon"}.get(actie)
+        if not stand:
+            return
+        self.bed.laadpaal = stand
+        self.bewaar_bediening()
+        naam = {"auto": "slim laden", "nu": "direct laden", "zon": "alleen op zon"}[stand]
+        self.logboek.schrijf("handmatig", f"Laadpaal via de melding op je telefoon op {naam} gezet", "laadpaal")
+        self.maak_plan()
+        await self.regel()
+
     def huidig(self) -> Kwartier | None:
         nu = kwartier_start(datetime.now(timezone.utc))
         for k in self.plan["kwartieren"]:
@@ -357,6 +401,8 @@ class Brein:
         vorige_verbonden = self.meting.auto_verbonden if self.meting else False
         self.meting = m
         if m.auto_verbonden != vorige_verbonden:
+            if m.auto_verbonden and not vorige_verbonden and getattr(self, "_gestart", False):
+                self._auto_net_aan = True             # na het nieuwe plan een melding met de keuze slim of direct laden
             self.herplan()
         k = self.huidig()
         nu = datetime.now(timezone.utc)

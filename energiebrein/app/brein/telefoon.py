@@ -37,7 +37,7 @@ async def diensten() -> list[str]:
     return sorted(namen, key=lambda n: (not n.startswith("mobile_app_"), n))
 
 
-async def stuur(dienst: str, titel: str, tekst: str, belangrijk: bool = False):
+async def stuur(dienst: str, titel: str, tekst: str, belangrijk: bool = False, acties: list | None = None):
     if not beschikbaar() or not dienst:
         raise RuntimeError("Telefoonmeldingen werken alleen als Energiebrein in Home Assistant draait.")
     from .net import sessie
@@ -45,6 +45,11 @@ async def stuur(dienst: str, titel: str, tekst: str, belangrijk: bool = False):
     pad = f"/hassio/ingress/{slug}"
     data = {"title": titel, "message": tekst,
             "data": {"tag": "energiebrein", "group": "energiebrein", "url": pad, "clickAction": pad}}
+    if acties:
+        # knoppen onder de melding (Home Assistant-app op iPhone en Android); het antwoord komt terug als
+        # gebeurtenis mobile_app_notification_action, zie luister()
+        data["data"]["actions"] = [{"action": a, "title": t} for a, t in acties]
+        data["data"]["tag"] = "energiebrein-auto"
     if belangrijk:
         data["data"]["push"] = {"interruption-level": "time-sensitive"}
         data["data"]["priority"] = "high"
@@ -53,6 +58,38 @@ async def stuur(dienst: str, titel: str, tekst: str, belangrijk: bool = False):
             if r.status == 400:
                 raise RuntimeError(f"Home Assistant kent de dienst notify.{dienst} niet.")
             r.raise_for_status()
+
+
+async def luister(bij_actie):
+    """Luistert via de websocket van Home Assistant naar knoppen die op een melding zijn ingedrukt. Blijft draaien en
+    maakt opnieuw verbinding als die wegvalt."""
+    if not beschikbaar():
+        return
+    import aiohttp
+    while True:
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.ws_connect("http://supervisor/core/websocket", heartbeat=30) as ws:
+                    await ws.receive_json()                                   # auth_required
+                    await ws.send_json({"type": "auth", "access_token": os.environ.get("SUPERVISOR_TOKEN", "")})
+                    if (await ws.receive_json()).get("type") != "auth_ok":
+                        raise RuntimeError("Home Assistant weigert de websocket")
+                    await ws.send_json({"id": 1, "type": "subscribe_events", "event_type": "mobile_app_notification_action"})
+                    async for bericht in ws:
+                        if bericht.type != aiohttp.WSMsgType.TEXT:
+                            continue
+                        d = bericht.json()
+                        actie = ((d.get("event") or {}).get("data") or {}).get("action")
+                        if d.get("type") == "event" and actie and str(actie).startswith("EB_"):
+                            try:
+                                await bij_actie(actie)
+                            except Exception:
+                                log.exception("Knop %s verwerken mislukt", actie)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.warning("Luisteren naar knoppen op meldingen mislukt (%s); over een minuut opnieuw", e)
+        await asyncio.sleep(60)
 
 
 class Telefoon:
@@ -68,7 +105,7 @@ class Telefoon:
     def aan(self) -> bool:
         return beschikbaar() and bool(self.dienst)
 
-    def meld(self, onderwerp: str, titel: str, tekst: str, belangrijk: bool = False):
+    def meld(self, onderwerp: str, titel: str, tekst: str, belangrijk: bool = False, acties: list | None = None):
         if not self.aan:
             return
         nu = datetime.now()
@@ -78,7 +115,7 @@ class Telefoon:
 
         async def _doe():
             try:
-                await stuur(self.dienst, titel, tekst, belangrijk)
+                await stuur(self.dienst, titel, tekst, belangrijk, acties)
             except Exception as e:
                 log.warning("Telefoonmelding mislukt: %s", e)
         try:

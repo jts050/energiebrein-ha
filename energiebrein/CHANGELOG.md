@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.11.0
+
+- **Melding als je de auto aansluit**, met knoppen: Slim laden, Direct laden of Alleen zon. In de melding staat wat slim laden kost en wanneer de auto klaar is, en wat direct laden nu zou kosten. Een tik op een knop zet de laadpaal meteen goed (werkt met de Home Assistant-app op iPhone en Android).
+
 ## 1.10.2
 
 - Kosten: een tabel per dag (bij Dit jaar per maand) met wat je betaalde, wat het zonder zon en accu had gekost, wat je bespaarde en hoe vol de accu begon en eindigde.
