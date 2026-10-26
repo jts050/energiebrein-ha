@@ -905,16 +905,18 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
       <details class="onderdeel" name="kdeel" data-deel="warmtepomp">
         <summary><span class="ico" style="background:color-mix(in srgb,var(--wp) 16%,transparent);color:var(--wp)"><svg><use href="#i-wp"/></svg></span><span class="wat"><b>Warmtepomp</b><span class="stand" id="st-warmtepomp">Nog niet gekoppeld</span></span><i class="lamp" id="lamp-warmtepomp"></i><svg class="pijl" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="inhoud">
-        <label class="f">Koppeling<select id="k-wp-type"><option value="uit">Geen / nog niet</option><option value="sgready_shelly">SG-ready via twee Shelly-relais</option></select></label>
+        <label class="f">Koppeling<select id="k-wp-type"><option value="uit">Geen / nog niet</option><option value="meter">Alleen meten (Shelly Pro 3EM of HomeWizard kWh-meter)</option><option value="sgready_shelly">Meten en sturen: SG-ready via Shelly-relais</option></select></label>
         <div data-toon="k-wp-type">
+          <div id="wp-sturen">
           <div class="f2"><label class="f">Relais 1 (SG Ready 1). Bij een Shelly Pro 3: IP/0<input id="k-wp-r1" placeholder="192.168.2.40/0"></label><button class="btn" type="button" data-test="shelly" data-ip="k-wp-r1">Test</button></div>
           <p class="res" id="r-k-wp-r1"></p>
           <div class="f2"><label class="f">Relais 2 (SG Ready 2). Bij een Shelly Pro 3: IP/1<input id="k-wp-r2" placeholder="192.168.2.40/1"></label><button class="btn" type="button" data-test="shelly" data-ip="k-wp-r2">Test</button></div>
           <p class="res" id="r-k-wp-r2"></p>
+          </div>
           <div class="f2"><label class="f">Energiemeter warmtepomp (HomeWizard kWh-meter of Shelly Pro 3EM, niet verplicht)<input id="k-wp-meter" placeholder="leeg = schatten uit vermogen en stand"></label><button class="btn" type="button" data-test="wpmeter" data-ip="k-wp-meter">Test</button></div>
           <p class="res" id="r-k-wp-meter"></p>
           <div class="f3"><label class="f">Vermogen (kW)<input id="k-wp-kw" type="number" step="0.1" min="0.5"></label><label class="f">Verbruik per jaar (kWh)<input id="k-wp-jaar" type="number" step="100" min="0"></label></div>
-          <div class="howto"><b>Comfort gaat voor</b>
+          <div class="howto" id="wp-comfort"><b>Comfort gaat voor</b>
             <p class="note" style="margin:4px 0 10px">Het brein laat de warmtepomp alleen even wachten op dure momenten. Binnen deze grenzen merk je daar niets van: een goed geïsoleerd huis blijft wel een uur op temperatuur, en de boiler wordt vóór je douchetijden niet geblokkeerd. Wil je het toch warmer, kies dan bij Bediening → Warmtepomp "Normaal".</p>
             <label class="f">Douche- en comforttijden (nooit wachten, ook niet het uur ervoor)<input id="k-wp-comfort" placeholder="06:00-08:30, 18:30-22:30"></label>
             <div class="f3"><label class="f">Wachten per dag (uur)<input id="k-wp-blok" type="number" step="0.5" min="0" max="6"></label>
@@ -1492,6 +1494,7 @@ $('autoform').addEventListener('submit',e=>{e.preventDefault();const week={};
 let K=null;
 const RICHTING=[['Zuid',0],['Zuidoost',-45],['Zuidwest',45],['Oost',-90],['West',90],['Noordoost',-135],['Noordwest',135],['Noord',180]];
 function toon(){document.querySelectorAll('[data-toon]').forEach(el=>el.hidden=$(el.dataset.toon).value==='uit');
+  const wpm=$('k-wp-type').value==='meter';$('wp-sturen').hidden=wpm;$('wp-comfort').hidden=wpm;
   const ot=$('k-omv-type').value;
   $('k-modbus').hidden=!['sunspec','solaredge','sma','huawei','sungrow','victron'].includes(ot);
   $('k-login').hidden=!['sessy','enphase','huawei'].includes(ot);$('k-gebr-l').hidden=ot==='huawei';

@@ -582,7 +582,9 @@ class Brein:
         # --- laadpaal ---
         b["laadpaal"] = await self._laadpaal(m, k)
         # --- warmtepomp ---
-        if self.cfg["warmtepomp"].get("type", "uit") != "uit":
+        if self.cfg["warmtepomp"].get("type", "uit") == "meter":
+            b["warmtepomp"] = "Wordt gemeten (nog niet gestuurd)"
+        elif self.cfg["warmtepomp"].get("type", "uit") != "uit":
             stand = self.bed.warmtepomp if self.bed.warmtepomp != "auto" else (k.wp_stand if k else "normaal")
             await self.huis.warmtepomp(stand)
             b["warmtepomp"] = {"boost": "Stookt extra op goedkope stroom", "wacht": "Wacht even, stroom is duur",

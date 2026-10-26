@@ -83,7 +83,8 @@ class Planner:
         c = self.cfg.get("warmtepomp", {})
         if c.get("type", "uit") == "uit":
             return
-        p = c["vermogen_kw"] * Q
+        alleen_meten = c.get("type") == "meter"            # alleen meten: verbruik verwachten, niets sturen
+        p = float(c.get("vermogen_kw") or 3.0) * Q
         dagen: dict = {}
         for k in kw:
             dagen.setdefault(k.start.astimezone().date(), []).append(k)
@@ -91,9 +92,11 @@ class Planner:
             totaal = wp_dag_kwh(ks[0].start) * len(ks) / 96   # deel van de dag binnen de horizon
             if totaal <= 0:
                 continue
-            nb, nw = int(c["boost_uren_per_dag"] * 4 * len(ks) / 96), int(c["blokkeer_uren_per_dag"] * 4 * len(ks) / 96)
+            nb, nw = int(c.get("boost_uren_per_dag", 0) * 4 * len(ks) / 96), int(c.get("blokkeer_uren_per_dag", 0) * 4 * len(ks) / 96)
             stand = {id(k): "normaal" for k in ks}
-            if bed.warmtepomp == "auto":
+            if alleen_meten:
+                pass
+            elif bed.warmtepomp == "auto":
                 volgorde = sorted(ks, key=self._marginaal)
                 for k in volgorde[:nb]:
                     stand[id(k)] = "boost"

@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.11.1
+
+- **Warmtepomp alleen meten.** Bij Koppelen → Warmtepomp kies je "Alleen meten" en vul je het IP-adres van een Shelly Pro 3EM of HomeWizard kWh-meter op de groep van de warmtepomp in. Het brein ziet dan wat de warmtepomp echt gebruikt, rekent dat mee in het plan en leert ervan, maar stuurt hem nog niet. Komen er later relais bij, dan kies je "Meten en sturen".
+
 ## 1.11.0
 
 - **Melding als je de auto aansluit**, met knoppen: Slim laden, Direct laden of Alleen zon. In de melding staat wat slim laden kost en wanneer de auto klaar is, en wat direct laden nu zou kosten. Een tik op een knop zet de laadpaal meteen goed (werkt met de Home Assistant-app op iPhone en Android).

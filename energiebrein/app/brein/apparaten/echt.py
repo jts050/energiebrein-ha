@@ -530,6 +530,30 @@ class SGReadyShelly:
         return {"wp_kw": {"boost": p, "wacht": 0.0}.get(self.stand, p * 0.35), "wp_stand": self.stand}
 
 
+class WPMeter:
+    """Alleen meten: een energiemeter (Shelly Pro 3EM, HomeWizard kWh-meter) op de groep van de warmtepomp, nog zonder
+    sturing. Het brein ziet dan wat de warmtepomp echt gebruikt en leert ervan, maar stuurt hem niet."""
+
+    def __init__(self, cfg: dict):
+        self.cfg = cfg["warmtepomp"]
+        self.stand = "normaal"
+
+    async def start(self):
+        pass
+
+    async def stop(self):
+        pass
+
+    async def warmtepomp(self, stand: str):
+        pass                                          # niets te sturen
+
+    async def lees(self) -> dict:
+        meter = (self.cfg.get("meter") or "").strip()
+        if not meter:
+            raise RuntimeError("vul het IP-adres van de energiemeter van de warmtepomp in")
+        return {"wp_kw": await shelly_vermogen_kw(meter), "wp_stand": "normaal"}
+
+
 async def shelly_vermogen_kw(host: str) -> float:
     """Vermogen (kW) van een tussenmeter op de groep van de warmtepomp.
     Werkt met de HomeWizard kWh-meter (1- en 3-fase, lokale API aanzetten in de HomeWizard-app),

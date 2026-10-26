@@ -70,6 +70,8 @@ class Huis:
             self.laadpaal = mk.TeslaWallConnector(cfg)
         if cfg["warmtepomp"].get("type") == "sgready_shelly":
             self.wp = echt.SGReadyShelly(cfg)
+        elif cfg["warmtepomp"].get("type") == "meter":
+            self.wp = echt.WPMeter(cfg)
 
     def onderdelen(self) -> dict:
         if self.sim:
