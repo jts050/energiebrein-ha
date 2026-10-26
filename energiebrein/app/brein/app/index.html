@@ -615,6 +615,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 #v-kosten .blok+.blok,#v-kosten .blok+.tweekol{margin-top:34px}#v-kosten .tweekol{gap:34px}
 @media (max-width:420px){.tabbar button{font-size:10.5px}}
 .stormbalk{display:flex;gap:12px;align-items:flex-start;border:1px solid color-mix(in srgb,var(--accu) 50%,transparent);border-radius:12px;padding:12px 14px;margin-bottom:14px}.stormbalk .stip{width:10px;height:10px;border-radius:50%;background:var(--accu);margin-top:5px;flex:none}.stormbalk p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.kosten-dag{font-size:14px;color:var(--muted);margin:10px 0 0;min-height:2.6em}.kosten-dag b{color:var(--ink)}.kosten-blok .staafjes i{cursor:pointer}.kosten-blok .staafjes i.kies{outline:2px solid var(--ink);outline-offset:1px}
 </style>
 </head>
 <body>
@@ -1383,7 +1384,7 @@ function renderKostenKort(){const o=OPB,el=$('kosten-kort');if(!o||!el||!o.dagen
   el.innerHTML=`<div class="kort-rij"><div><b class="goed">${eur(o.maand.besparing)}</b><span>bespaard in ${maandnaam}</span></div>`+
     (d?`<div><b>${eur(d.kosten)}</b><span>stroomkosten vandaag</span></div>`:'')+'</div>';}
 function staafjes(lijst,veld,label){const mx=Math.max(...lijst.map(d=>Math.abs(d[veld])),0.01),vd=new Date().toISOString().slice(0,10);
-  return `<div class="staafjes" role="img" aria-label="${label}">${lijst.map(d=>`<i class="${d[veld]<0?'min':''}${d.dag===vd?' vd':''}" style="height:${Math.max(Math.abs(d[veld])/mx*100,4)}%" title="${d.titel}: ${eur(d[veld])}"></i>`).join('')}</div>`;}
+  return `<div class="staafjes" role="img" aria-label="${label}">${lijst.map((d,i)=>`<i data-i="${i}" class="${d[veld]<0?'min':''}${d.dag===vd?' vd':''}" style="height:${Math.max(Math.abs(d[veld])/mx*100,4)}%" title="${d.titel}: ${eur(d[veld])}"></i>`).join('')}</div>`;}
 async function laadKosten(){try{const k=await api('/api/kosten?periode='+KP),t=k.totaal;
   const naam=KP==='jaar'?'in '+new Date().getFullYear():'in '+new Date(k.van+'T12:00').toLocaleDateString('nl-NL',{month:'long'});
   if(!t.dagen){$('kosten-kop').innerHTML=`<p class="klein">Nog geen metingen ${naam}.</p>`;$('kosten-cijfers').innerHTML='';$('kosten-uitleg').textContent='';return;}
@@ -1395,12 +1396,20 @@ async function laadKosten(){try{const k=await api('/api/kosten?periode='+KP),t=k
   const beste=lijst.reduce((a,d)=>d.besparing>(a?a.besparing:-1e9)?d:a,null);
   $('kosten-kop').innerHTML=`<div class="groot">${eur(t.besparing)}</div><span class="klein">bespaard ${naam}, vergeleken met alle stroom van het net halen</span>
     ${staafjes(lijst,'besparing',KP==='jaar'?'Besparing per maand':'Besparing per dag')}<div class="as"><span>${as[0]}</span><span>${as[1]}</span></div>
+    <p class="kosten-dag" id="kosten-dag">Tik op een staafje om te zien waar het bedrag uit bestaat.</p>
     <ul class="regels"><li><span>Stroomkosten</span><b>${eur(t.kosten)}</b></li>
     <li><span>Zonder zon en accu had het gekost</span><b>${eur(t.zonder_alles)}</b></li>
     <li><span>Waarvan bespaard door de accu en het brein</span><b>${eur(t.door_accu)}</b></li>
     <li><span>Terugleveren leverde op</span><b>${eur(t.teruglevering)}</b></li>
     ${beste&&lijst.length>2?`<li><span>Beste ${KP==='jaar'?'maand':'dag'}</span><b>${beste.titel}: ${eur(beste.besparing)}</b></li>`:''}
     ${KP==='maand'&&OPB&&OPB.volle_dagen>=3?`<li><span>Verwacht per jaar</span><b>± ${eur(OPB.per_jaar).replace(',00','')}</b></li>`:''}</ul>`;
+  document.querySelectorAll('#kosten-kop .staafjes i').forEach(el=>el.onclick=()=>{const d=lijst[+el.dataset.i];
+    document.querySelectorAll('#kosten-kop .staafjes i').forEach(x=>x.classList.toggle('kies',x===el));
+    const lad=d.lading_eur||0,soc=d.soc_begin!=null&&d.soc_eind!=null?` (accu van ${nf(d.soc_begin,0)}% naar ${nf(d.soc_eind,0)}%)`:'';
+    $('kosten-dag').innerHTML=`<b>${esc(d.titel)}: ${eur(d.besparing)} bespaard.</b> Zonder zon en accu ${eur(d.zonder_alles)}, je betaalde ${eur(d.kosten)}`
+      +(KP!=='jaar'&&Math.abs(lad)>=0.01?`, en de lading die er ${lad>0?'aan het eind meer':'aan het eind minder'} in zat telt mee voor ${eur(lad)}${soc}`:'')+'.'
+      +(d.besparing<0&&lad<0?' Rood komt hier doordat de accu leger eindigde: die stroom is op een eerdere dag als winst geteld.':'')
+      +(d.besparing<0&&lad>=0?' Rood: deze dag kostte stroom meer dan zonder accu. Kijk bij Gisteren achteraf waar het misging.':'');});
   const c=(w,s)=>`<div class="cijfer"><b>${w}</b><span>${s}</span></div>`;
   $('kosten-cijfers').innerHTML=c(nf(t.zon_kwh,0)+' kWh','Opgewekt door je panelen')+(t.zelf_gebruikt_pct!=null?c(t.zelf_gebruikt_pct+'%','Van je zonnestroom zelf gebruikt'):'')+
     c(nf(t.verbruik_kwh,0)+' kWh','Verbruik in totaal')+c(nf(t.afname_kwh,0)+' / '+nf(t.terug_kwh,0)+' kWh','Van het net / teruggeleverd')+

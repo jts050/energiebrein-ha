@@ -28,7 +28,9 @@ def opbrengst(rijen: list[dict], prijzen, dagen: int = 30, accu_kwh: float = 0.0
         beurs = r.get("beurs")
         if beurs is None:
             beurs = model_prijs(t)
-        inkoop, terug = prijzen.inkoop(beurs, t), prijzen.teruglever(beurs, t)
+        # de prijs die toen echt gold (sinds 1.10.1 bewaard); voor oudere kwartieren opnieuw uitrekenen
+        inkoop = r["inkoop"] if r.get("inkoop") is not None else prijzen.inkoop(beurs, t)
+        terug = r["terug"] if r.get("terug") is not None else prijzen.teruglever(beurs, t)
         verbruik = (r.get("huis_kwh") or 0) + (r.get("wp_kwh") or 0) + (r.get("auto_kwh") or 0)
         d = per_dag.get(dag)
         if d is None:
@@ -51,12 +53,13 @@ def opbrengst(rijen: list[dict], prijzen, dagen: int = 30, accu_kwh: float = 0.0
         if accu_kwh and d["_soc0"] is not None and d["_soc1"] is not None and d["_n"]:
             lading = (d["_soc1"] - d["_soc0"]) / 100 * accu_kwh * eta * d["_prijs"] / d["_n"]
         d["lading_eur"] = lading
+        d["soc_begin"], d["soc_eind"] = d["_soc0"], d["_soc1"]
         d["besparing"] = d["zonder_alles"] - d["kosten"] + lading
         d["door_accu"] = d["zonder_accu"] - d["kosten"] + lading
         for k in [k for k in d if k.startswith("_")]:
             del d[k]
         for k in list(d):
-            if k != "dag":
+            if k != "dag" and d[k] is not None:
                 d[k] = round(d[k], 2)
     vandaag = datetime.now().astimezone().date()
     maand = [d for d in lijst if d["dag"][:7] == vandaag.isoformat()[:7]]

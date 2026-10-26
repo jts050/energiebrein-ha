@@ -35,7 +35,9 @@ def bereken(cfg: dict, rijen: list[dict], prijs, soc_begin: float | None, onderg
     for r in goed:
         t = datetime.fromisoformat(r["start"])
         beurs = r.get("beurs") if r.get("beurs") is not None else 0.1
-        kw.append(Kwartier(start=t, beurs=beurs, inkoop=prijs.inkoop(beurs, t), teruglever=prijs.teruglever(beurs, t),
+        ink = r["inkoop"] if r.get("inkoop") is not None else prijs.inkoop(beurs, t)
+        ter = r["terug"] if r.get("terug") is not None else prijs.teruglever(beurs, t)
+        kw.append(Kwartier(start=t, beurs=beurs, inkoop=ink, teruglever=ter,
                            zon_kwh=max(r.get("zon_kwh") or 0, 0), huis_kwh=max(r.get("huis_kwh") or 0, 0),
                            wp_kwh=max(r.get("wp_kwh") or 0, 0), auto_kwh=max(r.get("auto_kwh") or 0, 0)))
     begin = soc_begin if soc_begin is not None else goed[0]["soc"]

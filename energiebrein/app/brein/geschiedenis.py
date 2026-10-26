@@ -8,7 +8,7 @@ from pathlib import Path
 from .model import Meting, KWARTIER_H
 
 VELDEN = ["net_kwh", "zon_kwh", "accu_kwh", "auto_kwh", "wp_kwh", "huis_kwh", "kosten", "kosten_zonder", "soc", "beurs",
-          "afname_kwh", "terug_kwh"]
+          "afname_kwh", "terug_kwh", "inkoop", "terug"]     # inkoop/terug: de echte prijs van dat kwartier (€/kWh)
 
 
 class Geschiedenis:
@@ -68,6 +68,7 @@ class Geschiedenis:
         r["terug_kwh"] += max(-net, 0.0)
         r["soc"] = m.accu_soc
         r["beurs"] = beurs
+        r["inkoop"], r["terug"] = inkoop, teruglever        # bewaren: achteraf rekenen met de prijs die je echt betaalde
         r["n"] += 1
 
     def _schrijf(self, r: dict) -> None:

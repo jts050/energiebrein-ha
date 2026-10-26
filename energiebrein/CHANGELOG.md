@@ -1,5 +1,10 @@
 # Wat er nieuw is
 
+## 1.10.1
+
+- Het brein bewaart nu per kwartier de prijs die je echt betaalde en kreeg (bij Tibber je echte Tibber-prijs). Kosten en Gisteren achteraf rekenen daarmee. Eerder werd de prijs voor oudere dagen opnieuw uitgerekend met de ingestelde opslag en belasting; wijkt dat af van je echte contract, dan kon een dag onterecht rood worden.
+- Kosten: tik op een staafje om te zien waar het bedrag van die dag uit bestaat, ook hoe de lading van de accu meetelt.
+
 ## 1.10.0
 
 - **Nieuw tabblad Kosten.** Deze maand, vorige maand of dit jaar: hoeveel je bespaarde, wat stroom kostte, wat het zonder zon en accu had gekost, wat de accu en het brein opleverden, terugleveren, de beste dag, en de kWh (zon, zelf gebruikt, net, auto, warmtepomp). Met een staafje per dag (of per maand). Ook "Vandaag" en "Gisteren achteraf" staan hier nu.
