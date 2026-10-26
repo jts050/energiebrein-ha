@@ -433,6 +433,10 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
             winst = -1
         if not 0 <= winst <= 1:
             raise HTTPException(400, "De minimale winst per kWh moet tussen € 0 en € 1 liggen (bijvoorbeeld 0,03).")
+        from .apparaten import dubbel_gebruik
+        dubbel = dubbel_gebruik(cfg)
+        if dubbel and not cfg.get("simulatie"):
+            raise HTTPException(400, dubbel + " Kies bij Slimme meter het juiste apparaat.")
         if cfg["accu"]["capaciteit_kwh"] > 200:
             raise HTTPException(400, "De accucapaciteit is groter dan 200 kWh. Vul de capaciteit in kWh in, niet in Wh.")
         config_pad.write_text("# Opgeslagen vanuit de app\n" + yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")

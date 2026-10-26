@@ -1650,10 +1650,15 @@ $('zoek').onclick=async()=>{
     $('zoekstatus').textContent=r.gevonden.length?`${r.gevonden.length} apparaten gevonden in ${r.netwerk||'je netwerk'}`:'Niets gevonden. Zit dit apparaat in hetzelfde wifi-netwerk als je installatie? Je kunt het IP-adres ook zelf invullen (staat in de app van het apparaat of in je router).';
     r.gevonden.forEach(x=>{const li=document.createElement('li');
       li.innerHTML=`<b>${esc(SOORTNAAM[x.soort]||x.soort)}</b><span>${esc(x.merk)}${x.naam&&x.naam!==x.merk?' · '+esc(x.naam):''}</span><span class="ip">${esc(x.ip)}</span>`;
-      const knop=(tekst,fn)=>{const b=document.createElement('button');b.type='button';b.className='btn klein';b.textContent=tekst;b.onclick=()=>{fn();b.textContent='✓ '+tekst;};li.appendChild(b);};
+      const knop=(tekst,fn)=>{const b=document.createElement('button');b.type='button';b.className='btn klein';b.textContent=tekst;b.onclick=()=>{if(fn()!==false)b.textContent='✓ '+tekst;};li.appendChild(b);};
+      const vervangP1=(type,ip)=>{const nu=$('k-p1-type').value,nuIp=$('k-p1-host').value.trim();
+        if(nu!=='uit'&&nuIp&&(nu!==type||nuIp!==ip)&&!confirm(`Je slimme meter is nu ${MERKNAAM[nu]||nu} op ${nuIp}. Vervangen door ${MERKNAAM[type]||type} op ${ip}?\n\nDe slimme meter moet het hele huis meten op de hoofdaansluiting.`))return false;
+        $('k-p1-type').value=type;$('k-p1-host').value=ip;toon();};
       const k=x.koppel||{};
       if(k.omvormer)knop('Koppel',()=>{$('k-omv-type').value=k.omvormer;$('k-omv-type').dispatchEvent(new Event('change'));$('k-omv-host').value=x.ip;if(k.modbus_poort){$('k-mb-poort').value=k.modbus_poort;$('k-mb-unit').value=k.modbus_unit;}toon();});
-      else if(k.p1)knop('Koppel',()=>{$('k-p1-type').value=k.p1;$('k-p1-host').value=x.ip;toon();});
+      else if(k.p1)knop('Koppel',()=>vervangP1(k.p1,x.ip));
+      else if(x.soort==='meter'){knop('Meter warmtepomp',()=>{if($('k-wp-type').value==='uit')$('k-wp-type').value='meter';$('k-wp-meter').value=x.ip;toon();});
+        if(/shelly/i.test(x.merk))knop('Als slimme meter',()=>vervangP1('shelly_em',x.ip));}
       else if(k.laadpaal)knop('Koppel',()=>{$('k-lp-type').value=k.laadpaal;$('k-lp-host').value=x.ip;toon();});
       else if(x.soort==='relais'){knop('Warmtepomp relais 1',()=>{$('k-wp-type').value='sgready_shelly';$('k-wp-r1').value=x.ip;toon();});knop('Relais 2',()=>{$('k-wp-type').value='sgready_shelly';$('k-wp-r2').value=x.ip;toon();});}
       else{const c=catInfo(x.merk);const sp=document.createElement('span');sp.className='note';

@@ -1,5 +1,12 @@
 # Wat er nieuw is
 
+## 1.11.3
+
+- **Een Shelly-energiemeter wordt niet meer vanzelf je slimme meter.** Zoeken toonde een Shelly Pro 3EM als "Slimme meter" met een knop Koppel. Meet die Shelly één groep (bijvoorbeeld de warmtepomp), dan rekende Energiebrein daarna met de warmtepomp als stroom van het net: het huisverbruik, het plan en de vergelijking met de GoodWe klopten niet meer. Nu staat een Shelly-meter bij Zoeken als tussenmeter, met de knoppen "Meter warmtepomp" en "Als slimme meter".
+- Vervang je de slimme meter via Zoeken, dan vraagt de app eerst of dat de bedoeling is.
+- Opslaan lukt niet meer als de slimme meter hetzelfde apparaat is als de meter of de relais van de warmtepomp, de laadpaal of de omvormer. Staat het al zo ingesteld, dan zie je een duidelijke melding op Thuis, en verdwijnt de verwarrende melding over de CT-klemmen van de GoodWe.
+- Een Shelly Pro 3EM als echte netmeter geeft nu ook waarden per fase, zodat de klemtest per fase ermee werkt.
+
 ## 1.11.2
 
 - Het bolletje Huis op Thuis laat nu het totale verbruik zien, inclusief warmtepomp en auto. Eerder stond daar alleen de rest van het huis, waardoor het op 0 kon staan terwijl de warmtepomp draaide.

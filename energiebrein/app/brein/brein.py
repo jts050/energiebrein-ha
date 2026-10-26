@@ -845,7 +845,13 @@ class Brein:
                         "actie": "Druk op de knop om de ondergrens in de omvormer gelijk te zetten aan Energiebrein, of pas de ontlaaddiepte aan in de SolarGo-app.",
                         "knop": {"tekst": f"Ondergrens op {max(10, int(self.cfg['accu']['min_soc']))}% zetten", "actie": "ondergrens",
                                  "waarde": max(10, int(self.cfg["accu"]["min_soc"]))}})
-        afwijking = self._meters_wijken_af()
+        from .apparaten import dubbel_gebruik
+        dubbel = None if self.cfg.get("simulatie", True) else dubbel_gebruik(self.cfg)
+        if dubbel:
+            uit.append({"ernst": "fout", "apparaat": "p1", "titel": "De slimme meter meet niet het hele huis",
+                        "uitleg": dubbel + " Daardoor kloppen het net, het huisverbruik en het plan niet.",
+                        "actie": "Ga naar Koppelen → Slimme meter, kies HomeWizard P1-meter (of druk op Zoeken en Koppel bij je P1-meter) en sla op."})
+        afwijking = None if dubbel else self._meters_wijken_af()
         if afwijking and self.cfg["omvormer"].get("meter_meet", "net") != "huis":
             p1, ct = afwijking
             uit.append({"ernst": "let op", "apparaat": "omvormer", "titel": "De meter van de GoodWe ziet iets anders dan je slimme meter",

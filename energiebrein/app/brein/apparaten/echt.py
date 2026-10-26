@@ -725,10 +725,14 @@ class ShellyEM(_Http):
     async def lees(self) -> dict:
         try:
             d = await self._get("/rpc/EM.GetStatus?id=0")
+            f = [d.get(f"{x}_act_power") for x in "abc"]
+            self.fasen = [float(v) / 1000 for v in f] if all(v is not None for v in f) else None   # + = afname
             return {"net_kw": float(d["total_act_power"]) / 1000}
         except Exception:
             d = await self._get("/status")
-            return {"net_kw": sum(float(e["power"]) for e in d["emeters"]) / 1000}
+            em = d["emeters"]
+            self.fasen = [float(e["power"]) / 1000 for e in em] if len(em) == 3 else None
+            return {"net_kw": sum(float(e["power"]) for e in em) / 1000}
 
 
 # ======================= go-e Charger (lokale API v2) =======================

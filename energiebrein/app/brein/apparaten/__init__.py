@@ -34,6 +34,35 @@ def _opdracht_tekst(naam: str, functie: str, args: tuple) -> str:
     return f"{naam}: {functie} {args}"
 
 
+def _ip(x) -> str:
+    return str(x or "").strip().partition("/")[0]
+
+
+def dubbel_gebruik(cfg: dict) -> str | None:
+    """Geeft een uitleg als de slimme meter (hoofdaansluiting) hetzelfde apparaat is als een ander onderdeel,
+    bijvoorbeeld de Shelly die de warmtepomp meet. Dan meet de 'slimme meter' maar één groep en klopt niets meer."""
+    p1 = (cfg.get("net") or {}).get("p1") or {}
+    p1ip = _ip(p1.get("host"))
+    if not p1ip or p1.get("type") in (None, "uit", "tibber"):
+        return None
+    anders = []
+    wp = cfg.get("warmtepomp") or {}
+    if wp.get("type") not in (None, "uit"):
+        anders += [(wp.get("meter"), "de meter van de warmtepomp"), (wp.get("relais1"), "relais 1 van de warmtepomp"),
+                   (wp.get("relais2"), "relais 2 van de warmtepomp")]
+    lp = cfg.get("laadpaal") or {}
+    if lp.get("type") not in (None, "uit"):
+        anders.append((lp.get("host"), "de laadpaal"))
+    omv = cfg.get("omvormer") or {}
+    if omv.get("type") not in (None, "uit"):
+        anders.append((omv.get("host"), "de omvormer"))
+    for ip, rol in anders:
+        if _ip(ip) == p1ip:
+            return (f"Bij Slimme meter staat {p1ip}, maar dat apparaat is ook {rol}. De slimme meter moet het hele huis meten op "
+                    "de hoofdaansluiting (meestal de HomeWizard P1 in de meterkast), niet één groep.")
+    return None
+
+
 class Huis:
     def __init__(self, cfg: dict):
         self.cfg = cfg

@@ -160,7 +160,9 @@ async def _web(s: aiohttp.ClientSession, ip: str, poort: int = 80) -> dict | Non
         model = str(d.get("model") or d.get("type") or "")
         naam = d.get("name") or model or "Shelly"
         if "EM" in model.upper():
-            return _vondst("p1", "Shelly Pro 3EM / EM", ip, naam, {"p1": "shelly_em"}, "web")
+            # Meestal meet zo'n Shelly één groep (warmtepomp, laadpaal). Niet automatisch als slimme meter koppelen:
+            # in de app kies je zelf waar hij voor is.
+            return _vondst("meter", "Shelly Pro 3EM / EM", ip, naam, None, "web")
         return _vondst("relais", "Shelly", ip, naam, None, "web")
     d = await _json(s, base + "/solar_api/GetAPIVersion.cgi")
     if isinstance(d, dict) and "APIVersion" in d:
