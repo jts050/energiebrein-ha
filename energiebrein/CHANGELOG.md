@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.11.2
+
+- Het bolletje Huis op Thuis laat nu het totale verbruik zien, inclusief warmtepomp en auto. Eerder stond daar alleen de rest van het huis, waardoor het op 0 kon staan terwijl de warmtepomp draaide.
+
 ## 1.11.1
 
 - **Warmtepomp alleen meten.** Bij Koppelen → Warmtepomp kies je "Alleen meten" en vul je het IP-adres van een Shelly Pro 3EM of HomeWizard kWh-meter op de groep van de warmtepomp in. Het brein ziet dan wat de warmtepomp echt gebruikt, rekent dat mee in het plan en leert ervan, maar stuurt hem nog niet. Komen er later relais bij, dan kies je "Meten en sturen".

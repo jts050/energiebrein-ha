@@ -1113,8 +1113,10 @@ function renderStroom(m,a){
       wp:actief?'stookt':'rust'}[k];
     g.querySelector('.sub').textContent=sub;
     if(k==='accu')g.querySelector('.ring').setAttribute('stroke-dasharray',`${(soc/100*RING).toFixed(1)} ${RING.toFixed(1)}`);}
-  el.querySelector('.huiswaarde .hw').textContent=nf(m.huis_kw);
-  el.querySelector('svg').setAttribute('aria-label',`Zon ${nf(m.zon_kw)} kW, net ${nf(m.net_kw)} kW, huis ${nf(m.huis_kw)} kW, accu ${nf(soc,0)} procent`);
+  // Het huis is alles wat er verbruikt wordt, ook de warmtepomp en de auto (die hangen eraan vast in het schema)
+  const totaal=m.huis_kw+(zicht.wp?m.wp_kw:0)+(zicht.auto?m.auto_kw:0);
+  el.querySelector('.huiswaarde .hw').textContent=nf(totaal);
+  el.querySelector('svg').setAttribute('aria-label',`Zon ${nf(m.zon_kw)} kW, net ${nf(m.net_kw)} kW, huis in totaal ${nf(totaal)} kW (waarvan overig ${nf(m.huis_kw)} kW), accu ${nf(soc,0)} procent`);
 }
 
 /* ---------- status ---------- */
