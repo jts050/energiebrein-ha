@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.11.4
+
+- Op Thuis staan vermogens onder de 10 kW nu met twee cijfers achter de komma (0,08 kW in plaats van 0,1 kW). Dat geldt voor de bolletjes, het totaal bij Huis, de accu-tekst en de warmtepomp bij Apparaten.
+
 ## 1.11.3
 
 - **Een Shelly-energiemeter wordt niet meer vanzelf je slimme meter.** Zoeken toonde een Shelly Pro 3EM als "Slimme meter" met een knop Koppel. Meet die Shelly één groep (bijvoorbeeld de warmtepomp), dan rekende Energiebrein daarna met de warmtepomp als stroom van het net: het huisverbruik, het plan en de vergelijking met de GoodWe klopten niet meer. Nu staat een Shelly-meter bij Zoeken als tussenmeter, met de knoppen "Meter warmtepomp" en "Als slimme meter".

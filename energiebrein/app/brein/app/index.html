@@ -1039,6 +1039,7 @@ function zetThema(k){
 document.querySelectorAll('#thema button').forEach(b=>b.onclick=()=>zetThema(b.dataset.t));
 zetThema(window.EB_THEMA||'donker');
 try{matchMedia('(prefers-color-scheme: light)').addEventListener('change',()=>{let k='donker';try{k=localStorage.getItem('eb-thema')||'donker'}catch(e){}if(k==='auto')zetThema('auto')})}catch(e){}
+const nf2=v=>nf(v,Math.abs(v)<10?2:1);   // twee cijfers achter de komma onder de 10 kW, zodat 0,08 kW niet als 0,1 telt
 const nf=(v,d=1)=>(Number(Number(v).toFixed(d))||0).toLocaleString('nl-NL',{minimumFractionDigits:d,maximumFractionDigits:d});
 const eur=v=>(Number(Number(v).toFixed(2))<0?'− ':'')+'€ '+nf(Math.abs(v),2);
 const tijd=iso=>new Date(iso).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
@@ -1105,17 +1106,17 @@ function renderStroom(m,a){
     g.classList.toggle('uit',!actief&&k!=='accu');
     v.style.display=actief?'':'none';v.classList.toggle('terug',p<0);
     v.style.setProperty('--duur',Math.max(0.7,3-kw*0.4).toFixed(2)+'s');v.style.strokeWidth=(2.2+Math.min(kw,6)*0.35).toFixed(2);
-    g.querySelector('.getal').textContent=k==='accu'?nf(soc,0):nf(kw);
+    g.querySelector('.getal').textContent=k==='accu'?nf(soc,0):nf2(kw);
     const sub={zon:actief?'produceert':'geen opbrengst',
       net:p>=0.05?'van het net':p<=-0.05?'naar het net':'geen uitwisseling',
-      accu:p>0.05?`levert ${nf(kw)} kW`:p<-0.05?`laadt ${nf(kw)} kW`:'wacht',
+      accu:p>0.05?`levert ${nf2(kw)} kW`:p<-0.05?`laadt ${nf2(kw)} kW`:'wacht',
       auto:m.auto_verbonden?(actief?'laadt':'aangesloten'):'geen auto',
       wp:actief?'stookt':'rust'}[k];
     g.querySelector('.sub').textContent=sub;
     if(k==='accu')g.querySelector('.ring').setAttribute('stroke-dasharray',`${(soc/100*RING).toFixed(1)} ${RING.toFixed(1)}`);}
   // Het huis is alles wat er verbruikt wordt, ook de warmtepomp en de auto (die hangen eraan vast in het schema)
   const totaal=m.huis_kw+(zicht.wp?m.wp_kw:0)+(zicht.auto?m.auto_kw:0);
-  el.querySelector('.huiswaarde .hw').textContent=nf(totaal);
+  el.querySelector('.huiswaarde .hw').textContent=nf2(totaal);
   el.querySelector('svg').setAttribute('aria-label',`Zon ${nf(m.zon_kw)} kW, net ${nf(m.net_kw)} kW, huis in totaal ${nf(totaal)} kW (waarvan overig ${nf(m.huis_kw)} kW), accu ${nf(soc,0)} procent`);
 }
 
@@ -1213,7 +1214,7 @@ function renderStatus(){
   if(a.laadpaal){const A=(S.auto||{}).auto||{},laadt=m.auto_kw>0.05;
     const fig=A.soc!=null?`${nf(A.soc,0)}%`:laadt?`${nf(m.auto_kw)} kW`:'–';
     r.push(['var(--auto)','Auto',m.auto_verbonden?(laadt?(A.soc!=null?`laadt ${nf(m.auto_kw)} kW`:'laadt'):'aangesloten'):'niet aangesloten',fig]);}
-  if(a.warmtepomp)r.push(['var(--wp)','Warmtepomp',esc((b.warmtepomp||'').split(/[.:]/)[0]||'Normaal'),m.wp_kw>0.05?`${nf(m.wp_kw)} kW`:'rust']);
+  if(a.warmtepomp)r.push(['var(--wp)','Warmtepomp',esc((b.warmtepomp||'').split(/[.:]/)[0]||'Normaal'),m.wp_kw>0.02?`${nf2(m.wp_kw)} kW`:'rust']);
   $('rijen').innerHTML=r.map(([c,nm,sub,fig])=>`<li data-naar="bediening"><i style="background:${c}"></i><span class="rn"><b>${nm}</b><small>${sub}</small></span><span class="fig">${fig}</span></li>`).join('');
   $('rijen').querySelectorAll('[data-naar]').forEach(li=>li.onclick=()=>view(li.dataset.naar));
   renderAI(v);
