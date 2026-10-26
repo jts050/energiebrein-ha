@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.10.2
+
+- Kosten: een tabel per dag (bij Dit jaar per maand) met wat je betaalde, wat het zonder zon en accu had gekost, wat je bespaarde en hoe vol de accu begon en eindigde.
+
 ## 1.10.1
 
 - Het brein bewaart nu per kwartier de prijs die je echt betaalde en kreeg (bij Tibber je echte Tibber-prijs). Kosten en Gisteren achteraf rekenen daarmee. Eerder werd de prijs voor oudere dagen opnieuw uitgerekend met de ingestelde opslag en belasting; wijkt dat af van je echte contract, dan kon een dag onterecht rood worden.

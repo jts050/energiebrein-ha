@@ -616,6 +616,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 @media (max-width:420px){.tabbar button{font-size:10.5px}}
 .stormbalk{display:flex;gap:12px;align-items:flex-start;border:1px solid color-mix(in srgb,var(--accu) 50%,transparent);border-radius:12px;padding:12px 14px;margin-bottom:14px}.stormbalk .stip{width:10px;height:10px;border-radius:50%;background:var(--accu);margin-top:5px;flex:none}.stormbalk p{margin:2px 0 0;color:var(--muted);font-size:14px}
 .kosten-dag{font-size:14px;color:var(--muted);margin:10px 0 0;min-height:2.6em}.kosten-dag b{color:var(--ink)}.kosten-blok .staafjes i{cursor:pointer}.kosten-blok .staafjes i.kies{outline:2px solid var(--ink);outline-offset:1px}
+.tabelwrap{overflow-x:auto}.kosten-tabel{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}.kosten-tabel th,.kosten-tabel td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.kosten-tabel th:first-child,.kosten-tabel td:first-child{text-align:left}.kosten-tabel th{color:var(--muted);font-weight:600;font-size:12.5px}.kosten-tabel td.plus{color:var(--good);font-weight:600}.kosten-tabel td.min{color:var(--bad);font-weight:600}
 </style>
 </head>
 <body>
@@ -678,6 +679,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
       <div class="kop1"><div><h1>Kosten</h1><p>Wat stroom kost, en wat je zon, accu en het brein je opleveren.</p></div>
         <div class="keuze" id="kosten-periode"><button data-p="maand" aria-pressed="true">Deze maand</button><button data-p="vorige">Vorige maand</button><button data-p="jaar">Dit jaar</button></div></div>
       <div class="blok opb kosten-blok"><div id="kosten-kop"><p class="klein">Laden…</p></div></div>
+      <div class="blok"><h2 id="kosten-lijst-kop">Per dag</h2><div class="tabelwrap"><table class="kosten-tabel" id="kosten-lijst"></table></div></div>
       <div class="blok"><h2>Waar het in zit</h2><div class="cijfers" id="kosten-cijfers"></div><p class="note" id="kosten-uitleg"></p></div>
       <div class="tweekol">
         <div class="blok"><h2>Vandaag</h2><div class="cijfers" id="vandaag"></div></div>
@@ -1403,6 +1405,10 @@ async function laadKosten(){try{const k=await api('/api/kosten?periode='+KP),t=k
     <li><span>Terugleveren leverde op</span><b>${eur(t.teruglevering)}</b></li>
     ${beste&&lijst.length>2?`<li><span>Beste ${KP==='jaar'?'maand':'dag'}</span><b>${beste.titel}: ${eur(beste.besparing)}</b></li>`:''}
     ${KP==='maand'&&OPB&&OPB.volle_dagen>=3?`<li><span>Verwacht per jaar</span><b>± ${eur(OPB.per_jaar).replace(',00','')}</b></li>`:''}</ul>`;
+  $('kosten-lijst-kop').textContent=KP==='jaar'?'Per maand':'Per dag';
+  $('kosten-lijst').innerHTML=`<tr><th>${KP==='jaar'?'Maand':'Dag'}</th><th>Betaald</th><th>Zonder zon en accu</th><th>Bespaard</th>${KP!=='jaar'?'<th>Accu</th>':''}</tr>`
+    +[...lijst].reverse().map(d=>`<tr><td>${esc(d.titel)}</td><td>${eur(d.kosten)}</td><td>${eur(d.zonder_alles)}</td><td class="${d.besparing<0?'min':'plus'}">${eur(d.besparing)}</td>`
+      +(KP!=='jaar'?`<td class="klein">${d.soc_begin!=null&&d.soc_eind!=null?`${nf(d.soc_begin,0)}% → ${nf(d.soc_eind,0)}%`:'–'}</td>`:'')+'</tr>').join('');
   document.querySelectorAll('#kosten-kop .staafjes i').forEach(el=>el.onclick=()=>{const d=lijst[+el.dataset.i];
     document.querySelectorAll('#kosten-kop .staafjes i').forEach(x=>x.classList.toggle('kies',x===el));
     const lad=d.lading_eur||0,soc=d.soc_begin!=null&&d.soc_eind!=null?` (accu van ${nf(d.soc_begin,0)}% naar ${nf(d.soc_eind,0)}%)`:'';
