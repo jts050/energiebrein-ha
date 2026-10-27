@@ -6,3 +6,5 @@ carconnectivity-connector-volkswagen
 carconnectivity-connector-audi
 carconnectivity-connector-skoda
 carconnectivity-connector-seatcupra
+# Volkswagen-groep via het officiële EU Data Act-portaal (werkt nog, alleen uitlezen, elke 15 minuten)
+carconnectivity-connector-vw-eu-data-act

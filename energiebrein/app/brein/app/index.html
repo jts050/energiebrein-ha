@@ -892,13 +892,19 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         <summary><span class="ico" style="background:color-mix(in srgb,var(--auto) 16%,transparent);color:var(--auto)"><svg><use href="#i-auto"/></svg></span><span class="wat"><b>Auto</b><span class="stand" id="st-auto">Niet gekoppeld (niet verplicht)</span></span><i class="lamp" id="lamp-auto"></i><svg class="pijl" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="inhoud">
           <p class="note">Met je auto gekoppeld ziet het brein hoe vol de accu van je auto is. Dan kun je kiezen voor "laden tot 80%" in plaats van een aantal km. Inloggen gaat met hetzelfde account als de app van je auto. Je wachtwoord blijft op dit apparaat.</p>
-          <label class="f">Merk<select id="k-car-merk"><option value="uit">Niet koppelen</option><option value="volkswagen">Volkswagen (VW-app / We Connect)</option><option value="audi">Audi (myAudi)</option><option value="skoda">Skoda (MySkoda)</option><option value="seatcupra">Seat / Cupra</option></select></label>
+          <label class="f">Merk<select id="k-car-merk"><option value="uit">Niet koppelen</option><optgroup label="Via het EU Data Act-portaal (aanbevolen)"><option value="eu_volkswagen">Volkswagen</option><option value="eu_audi">Audi</option><option value="eu_skoda">Skoda</option><option value="eu_seat">Seat</option><option value="eu_cupra">Cupra</option></optgroup><optgroup label="Via de app van het merk"><option value="volkswagen">Volkswagen (werkt niet meer sinds juni 2026)</option><option value="audi">Audi (myAudi)</option><option value="skoda">Skoda (MySkoda)</option><option value="seatcupra">Seat / Cupra</option></optgroup></select></label>
+          <div class="note" id="k-car-eu" hidden><b>Eén keer instellen in het portaal:</b><ol style="margin:6px 0 0;padding-left:18px">
+            <li>Log in op <a href="https://eu-data-act.drivesomethinggreater.com/" target="_blank" rel="noopener">eu-data-act.drivesomethinggreater.com</a> met het account van je auto en accepteer wat het portaal vraagt.</li>
+            <li>Ga naar <b>Data clusters → Vehicle overview</b> en koppel je auto als hij er nog niet staat.</li>
+            <li>Klik bij je auto op <b>Get customised data</b> en zet een <b>doorlopende</b> aanvraag aan met een frequentie van <b>15 minuten</b>.</li>
+            <li>Wacht tot er bestanden verschijnen (soms een uur) en druk dan hieronder op Test.</li></ol>
+            Alleen uitlezen: het brein ziet hoe vol de auto is, maar kan de auto zelf niets opdragen. Het laden regelt het brein via de laadpaal.</div>
           <div id="k-car-velden">
             <div class="f2"><label class="f">E-mail<input id="k-car-gebr" autocomplete="off"></label><label class="f">Wachtwoord<input id="k-car-ww" type="password" autocomplete="off"></label></div>
             <div class="f2"><label class="f">S-PIN (alleen als je app erom vraagt)<input id="k-car-spin" inputmode="numeric" autocomplete="off"></label><label class="f">VIN (leeg = je eerste auto)<input id="k-car-vin" autocomplete="off"></label></div>
             <div class="row" style="margin:-4px 0 10px"><button class="btn" type="button" id="cartest">Test</button></div>
             <p class="res" id="r-car"></p>
-            <p class="note">Het brein vraagt de gegevens hooguit eens per 5 minuten op. Vaker blokkeren de fabrikanten je account soms tijdelijk. De grootte van de accu van je auto vul je in bij Laadpaal.</p>
+            <p class="note">Het brein vraagt de gegevens hooguit eens per 5 minuten op (via het portaal eens per 15 minuten). Vaker blokkeren de fabrikanten je account soms tijdelijk. De grootte van de accu van je auto vul je in bij Laadpaal.</p>
           </div>
         </div>
       </details>
@@ -1512,6 +1518,7 @@ function toon(){document.querySelectorAll('[data-toon]').forEach(el=>el.hidden=$
   $('k-goe').querySelector('button').dataset.test=$('k-lp-type').value==='tesla'?'tesla':'goe';
   $('k-tibber-blok').hidden=$('k-lev').value!=='tibber';
   $('k-car-velden').hidden=$('k-car-merk').value==='uit';
+  {const eu=$('k-car-merk').value.startsWith('eu_');$('k-car-eu').hidden=!eu;$('k-car-spin').closest('label').hidden=eu;}
   const tips={homewizard:'Zet in de HomeWizard-app de lokale API aan: Instellingen → Meters → je meter → Lokale API.',youless:'De Youless moet in hetzelfde netwerk hangen; er is geen wachtwoord nodig.',p1monitor:'P1 Monitor draait meestal op een Raspberry Pi in de meterkast.',shelly_em:'De Shelly EM moet op de hoofdaansluiting gemeten worden, niet op één groep.',esphome:'Werkt met de SlimmeLezer en andere ESPHome-P1-lezers.',tibber:'Vul je Tibber-code in bij Contract en huis. De Pulse wordt live uitgelezen via Tibber.'};
   $('k-p1-tip').textContent=tips[$('k-p1-type').value]||'';
   const vast=$('k-contract').value==='vast';$('k-vast').hidden=!vast;$('k-dyn').hidden=vast;}

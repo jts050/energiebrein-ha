@@ -1,5 +1,10 @@
 # Wat er nieuw is
 
+## 1.12.0
+
+- **Volkswagen, Audi, Skoda, Seat en Cupra via het EU Data Act-portaal.** Volkswagen laat sinds eind mei 2026 geen andere programma's meer inloggen via de VW-app (ook Home Assistant en evcc niet). De officiële route die wel werkt is het EU Data Act-portaal van de VW-groep. Kies bij Koppelen → Auto het merk onder "Via het EU Data Act-portaal" en zet één keer in het portaal een doorlopende gegevensaanvraag van 15 minuten aan; de stappen staan in de app. Alleen uitlezen: het brein ziet hoe vol de auto is en laadt via de laadpaal.
+- Wie nog op de oude Volkswagen-koppeling staat, krijgt een duidelijke melding met wat hij moet kiezen in plaats van "inloggen lukt niet".
+
 ## 1.11.4
 
 - Op Thuis staan vermogens onder de 10 kW nu met twee cijfers achter de komma (0,08 kW in plaats van 0,1 kW). Dat geldt voor de bolletjes, het totaal bij Huis, de accu-tekst en de warmtepomp bij Apparaten.
