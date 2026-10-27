@@ -604,6 +604,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 /* koppelen: geavanceerde meting en regeling */
 .extra.meet{margin-top:10px;border-top:1px solid var(--hair);padding-top:12px}
 .fasetest table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin:4px 0}.fasetest th,.fasetest td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--hair)}.fasetest th:first-child,.fasetest td:first-child{text-align:left}.fasetest tr.af td{color:var(--bad)}.fase-kop{margin:16px 0 4px;font-size:14px}
+.leerweek table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13.5px}.leerweek th,.leerweek td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.leerweek th:first-child,.leerweek td:first-child{text-align:left}.leerweek th{color:var(--muted);font-weight:600;font-size:12px}.leerweek td.goed{color:var(--good);font-weight:600}.leerweek td.af{color:var(--bad);font-weight:600}.leerweek .feit{margin:0 0 10px;font-size:15px}.leerweek .feit span{display:block;font-size:13px;color:var(--muted)}
 .klemtest-uit{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:8px 0;font-size:14px}.klemtest-uit.goed{border-color:var(--good)}.klemtest-uit.fout{border-color:var(--bad)}.klemtest-uit,.klemtest-uit li,.klemtest-uit b{color:var(--ink)}.klemtest-uit ul{margin:6px 0 0;padding-left:18px}.klemtest-uit li{margin:3px 0}
 /* tablet staand: schema groter en in het midden, lijsten over de hele breedte */
 @media (min-width:600px) and (max-width:980px){.stroom svg{max-width:min(100%,620px);margin:0 auto}.straks-sectie,.spark-sectie{max-width:none}}
@@ -721,6 +722,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
       </div>
       </div>
       <div class="blok"><h2>Wat het brein over je huis weet</h2><div class="ai" id="ai"></div></div>
+      <div class="blok"><h2>Leren: de laatste 7 dagen</h2><div id="leerweek" class="tabelwrap leerweek"><p class="klein">Even laden…</p></div></div>
     </section>
 
     <!-- ============ BEDIENING ============ -->
@@ -1934,6 +1936,39 @@ $('lbdagen').onchange=laadLogboek;
 setInterval(laadLogboek,30000);
 setInterval(()=>{laadOpbrengst();if(!$('v-kosten').hidden)laadKosten();},300000);
 setInterval(laadStatus,5000);
+/* ---------- leren: voorspeld en echt per dag, de laatste 7 dagen ---------- */
+async function laadLeerweek(){
+  const el=$('leerweek');if(!el)return;
+  try{
+    const van=new Date();van.setHours(0,0,0,0);van.setDate(van.getDate()-6);
+    const uren=Math.ceil((Date.now()-van)/36e5)+1;
+    const [E,V]=await Promise.all([api(`/api/geschiedenis?uren=${uren}`),api(`/api/voorspeld?uren=${uren}`)]);
+    const vm=new Map(V.map(x=>[x.start,x])),dag=iso=>{const t=new Date(iso);return t.getFullYear()*1e4+(t.getMonth()+1)*100+t.getDate();};
+    const dagen=new Map(),uur=new Map();
+    for(const e of E){if(e.n<3||new Date(e.start)<van)continue;const k=dag(e.start),d=dagen.get(k)||{t:new Date(e.start),hv:0,he:0,zv:0,ze:0,wp:0,n:0};
+      d.wp+=e.wp_kwh||0;const v=vm.get(e.start);
+      if(v){d.hv+=v.huis_kwh;d.he+=e.huis_kwh||0;d.zv+=v.zon_kwh;d.ze+=e.zon_kwh||0;d.n++;
+        const u=Math.floor(new Date(e.start).getTime()/36e5),b=uur.get(u)||{hv:0,he:0,zv:0,ze:0};b.hv+=v.huis_kwh;b.he+=e.huis_kwh||0;b.zv+=v.zon_kwh;b.ze+=e.zon_kwh||0;uur.set(u,b);}
+      dagen.set(k,d);}
+    const rijen=[...dagen.entries()].sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+    if(!rijen.some(d=>d.n>0)){el.innerHTML='<p class="klein">Het brein bewaart zijn voorspellingen sinds kort. Over een paar uur verschijnt hier de eerste vergelijking.</p>';return;}
+    const pct=(v,e)=>e>0.3?Math.round((v-e)/e*100):null,tk=p=>p==null?'–':(p>0?'+':p<0?'−':'')+Math.abs(p)+'%';
+    const kl=p=>p==null?'':Math.abs(p)<=15?'goed':Math.abs(p)<=30?'':'af';
+    const heeftWp=!!(S.apparaten&&S.apparaten.warmtepomp)||rijen.some(d=>d.wp>0.2);
+    let tab='<table><tr><th></th><th colspan="3">Huisverbruik (kWh)</th><th colspan="3">Zon (kWh)</th>'+(heeftWp?'<th>Warmtepomp</th>':'')+'</tr><tr><th></th><th>voorspeld</th><th>echt</th><th></th><th>voorspeld</th><th>echt</th><th></th>'+(heeftWp?'<th>echt</th>':'')+'</tr>';
+    for(const d of rijen){const ph=pct(d.hv,d.he),pz=pct(d.zv,d.ze),nu=dag(d.t)===dag(new Date());
+      tab+=`<tr><td>${nu?'vandaag':d.t.toLocaleDateString('nl-NL',{weekday:'short',day:'numeric'})}</td><td>${d.n?nf(d.hv,1):'–'}</td><td>${d.n?nf(d.he,1):'–'}</td><td class="${kl(ph)}">${tk(ph)}</td><td>${d.n?nf(d.zv,1):'–'}</td><td>${d.n?nf(d.ze,1):'–'}</td><td class="${kl(pz)}">${tk(pz)}</td>${heeftWp?`<td>${nf(d.wp,1)}</td>`:''}</tr>`;}
+    tab+='</table>';
+    let fh=0,eh=0,fz=0,ez=0;for(const b of uur.values()){fh+=Math.abs(b.hv-b.he);eh+=b.he;fz+=Math.abs(b.zv-b.ze);ez+=b.ze;}
+    const sam=[];if(eh>1)sam.push(`Huisverbruik zat per uur gemiddeld <b>${Math.round(fh/eh*100)}%</b> ernaast`);
+    if(ez>1)sam.push(`de zon <b>${Math.round(fz/ez*100)}%</b>`);
+    const dagenN=rijen.filter(d=>d.n>0).length;
+    el.innerHTML=(sam.length?`<p class="feit"><b>${sam.join(', ')}.</b> <span>Over ${dagenN} ${dagenN===1?'dag':'dagen'} waarvoor het brein vooraf een voorspelling bewaarde.</span></p>`:'')+tab+
+      '<p class="note">Voorspeld is wat het brein minstens een uur vooraf verwachtte. Per dag mogen de verschillen een stuk kleiner zijn dan per uur, omdat te hoge en te lage uren elkaar opheffen. Groen is binnen 15%. De warmtepomp wordt alleen gemeten; daar bewaart het brein nog geen voorspelling van.</p>';
+  }catch(e){el.innerHTML=`<p class="note">${esc(e.message||'Niet te laden')}</p>`;}
+}
+setTimeout(laadLeerweek,1500);setInterval(laadLeerweek,600000);
+
 setInterval(laadPlan,60000);
 </script>
 </body>

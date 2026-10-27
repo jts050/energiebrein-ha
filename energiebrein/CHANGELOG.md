@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.12.1
+
+- **Leren: de laatste 7 dagen** (Plan). Per dag zie je wat het brein vooraf voorspelde voor huisverbruik en zon, wat het echt werd en hoeveel procent ernaast, met een samenvatting per uur over de hele week. De warmtepomp staat er ook bij (alleen gemeten).
+
 ## 1.12.0
 
 - **Volkswagen, Audi, Skoda, Seat en Cupra via het EU Data Act-portaal.** Volkswagen laat sinds eind mei 2026 geen andere programma's meer inloggen via de VW-app (ook Home Assistant en evcc niet). De officiële route die wel werkt is het EU Data Act-portaal van de VW-groep. Kies bij Koppelen → Auto het merk onder "Via het EU Data Act-portaal" en zet één keer in het portaal een doorlopende gegevensaanvraag van 15 minuten aan; de stappen staan in de app. Alleen uitlezen: het brein ziet hoe vol de auto is en laadt via de laadpaal.
