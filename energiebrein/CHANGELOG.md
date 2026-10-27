@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.12.2
+
+- Plan op een groot scherm: "Wat het brein over je huis weet" staat nu rechts onder Verwachting, zodat daar geen lege plek meer is naast de lange lijst met wat er gaat gebeuren.
+
 ## 1.12.1
 
 - **Leren: de laatste 7 dagen** (Plan). Per dag zie je wat het brein vooraf voorspelde voor huisverbruik en zon, wat het echt werd en hoeveel procent ernaast, met een samenvatting per uur over de hele week. De warmtepomp staat er ook bij (alleen gemeten).

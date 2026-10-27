@@ -369,6 +369,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 .blok h2 small{text-transform:none;letter-spacing:0}
 .tweekol,.ai,.apparaten,.kgrid{gap:34px}
 #v-plan .blok+.blok,#gemeten .blok+.blok{margin-top:34px}
+.kolrechts{min-width:0}
 .cijfers{gap:0;grid-template-columns:1fr}
 .cijfer{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:13px 0;border-bottom:1px solid var(--hair)}
 .cijfer b{order:2;font-size:15px;font-weight:600;letter-spacing:0;text-align:right}
@@ -718,10 +719,12 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
       </div>
       <div class="tweekol">
         <div class="blok"><h2>Wat er gaat gebeuren</h2><ul class="acties" id="acties"></ul></div>
-        <div class="blok"><h2>Verwachting</h2><div class="cijfers" id="verwachting"></div></div>
+        <div class="kolrechts">
+          <div class="blok"><h2>Verwachting</h2><div class="cijfers" id="verwachting"></div></div>
+          <div class="blok"><h2>Wat het brein over je huis weet</h2><div class="ai" id="ai"></div></div>
+        </div>
       </div>
       </div>
-      <div class="blok"><h2>Wat het brein over je huis weet</h2><div class="ai" id="ai"></div></div>
       <div class="blok"><h2>Leren: de laatste 7 dagen</h2><div id="leerweek" class="tabelwrap leerweek"><p class="klein">Even laden…</p></div></div>
     </section>
 
