@@ -663,8 +663,11 @@ class DeyeSolarman:
 
 
 class Solis:
-    """Solis hybride omvormers (S6-EH3P…-H, S5-EH1P…, RHI) via Modbus TCP op de LAN-stick of wifi-stick, poort 502, unit 1.
-    Alleen uitlezen. Registers (input, functiecode 4) volgens het Solis RS485-Modbus-protocol voor hybrides:
+    """Solis hybride omvormers (S6-EH3P…-H, S5-EH1P…, RHI). Alleen uitlezen.
+    Twee manieren om te praten, afhankelijk van de stick:
+    - Modbus TCP op poort 502 (LAN-stick en sommige wifi-sticks): vul alleen het IP-adres in.
+    - Solarman V5 op poort 8899 (de meeste wifi-sticks): vul ook het serienummer van de stick in.
+    Registers (input, functiecode 4) volgens het Solis RS485-Modbus-protocol voor hybrides:
     33057-33058 PV-vermogen (u32, W), 33130-33131 meter (s32, W, + = teruglevering), 33135 accu-richting (0 laden, 1 ontladen),
     33139 accu-lading (%), 33147 huisverbruik (u16, W), 33149-33150 accuvermogen (s32, W). 32-bits waarden: eerste woord hoogste.
     Het teken van het accuvermogen is niet bij alle firmware gelijk; daarom bepaalt register 33135 de richting."""
@@ -672,26 +675,53 @@ class Solis:
 
     def __init__(self, cfg: dict):
         o = cfg["omvormer"]
-        self.mb = Modbus(o["host"], int(o.get("modbus_poort", 502)), int(o.get("modbus_unit", 1)))
+        self.host = o["host"]
+        self.serie = str(o.get("serienummer") or "").strip()
+        self.mb = Modbus(self.host, int(o.get("modbus_poort", 502)), int(o.get("modbus_unit", 1)))
+        self.v5 = None
 
     @classmethod
     def voor_test(cls, ip, extra):
-        return cls({"omvormer": {"host": ip, "modbus_poort": extra.get("modbus_poort", 502), "modbus_unit": extra.get("modbus_unit", 1)}})
+        return cls({"omvormer": {"host": ip, "modbus_poort": extra.get("modbus_poort", 502), "modbus_unit": extra.get("modbus_unit", 1),
+                                 "serienummer": extra.get("serienummer")}})
 
     async def start(self):
-        await self.mb.open()
+        if self.serie:
+            if not self.serie.isdigit():
+                raise ValueError("Het serienummer van de wifi-stick bestaat uit alleen cijfers (meestal 10). Controleer de sticker op de stick.")
+            from pysolarmanv5 import PySolarmanV5Async
+            self.v5 = PySolarmanV5Async(self.host, int(self.serie), port=8899, mb_slave_id=int(self.mb.unit))
+            await self.v5.connect()
+            return
+        try:
+            await self.mb.open()
+        except ConnectionError as e:
+            raise ConnectionError(f"{e} Heeft de omvormer een wifi-stick? Vul dan ook het serienummer van de stick in; dan gebruikt het brein poort 8899.") from None
 
     async def stop(self):
         self.mb.sluit()
+        if self.v5:
+            try:
+                await self.v5.disconnect()
+            except Exception:
+                pass
+            self.v5 = None
+
+    async def _lees(self, adres: int, aantal: int) -> list[int]:
+        if self.serie:
+            if self.v5 is None:
+                await self.start()
+            return list(await self.v5.read_input_registers(adres, aantal))
+        return await self.mb.lees(adres, aantal, "input")
 
     async def lees(self) -> dict:
         try:
-            r = await self.mb.lees(33130, 21, "input")        # 33130 … 33150 in één keer
+            r = await self._lees(33130, 21)                   # 33130 … 33150 in één keer
         except IOError:                                       # sommige sticks weigeren een groot blok: dan per register
             r = [0] * 21
             for i in (0, 1, 5, 9, 17, 19, 20):
-                r[i] = (await self.mb.lees(33130 + i, 1, "input"))[0]
-        zon = u32(await self.mb.lees(33057, 2, "input"))
+                r[i] = (await self._lees(33130 + i, 1))[0]
+        zon = u32(await self._lees(33057, 2))
         meter = s32(r[0:2])
         richting, soc, last, accu = r[5], r[9], r[17], s32(r[19:21])
         if soc > 100 or richting > 1:

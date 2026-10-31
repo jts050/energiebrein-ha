@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.13.2
+
+- **Solis met wifi-stick.** Geeft de stick geen antwoord op poort 502, vul dan bij Koppelen het serienummer van de wifi-stick in (alleen cijfers, staat op de stick). Het brein praat dan via de Solarman-route op poort 8899, met dezelfde registers.
+
 ## 1.13.1
 
 - **Opslaan en herstarten deed soms niets.** De browser blokkeerde het opslaan stil als een getalveld in een ingeklapt onderdeel een waarde had die niet bij de stapgrootte paste (bijvoorbeeld een breedtegraad met vier decimalen). Nu slaat het gewoon op. Staat er echt iets fout (buiten het bereik of geen getal), dan klapt het onderdeel open en zie je welk veld het is.
