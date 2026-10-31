@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.13.0
+
+- **Solis hybride omvormers (alleen uitlezen).** Bij Koppelen → Omvormer kies je "Solis hybride" en vul je het IP-adres van de omvormer of de LAN-stick in (poort 502, unit 1). Het brein leest zon, accu (percentage en vermogen) en huisverbruik, en het net als er een meter op de omvormer zit. Sturen volgt als het uitlezen bij jou klopt.
+
 ## 1.12.2
 
 - Plan op een groot scherm: "Wat het brein over je huis weet" staat nu rechts onder Verwachting, zodat daar geen lege plek meer is naast de lange lijst met wat er gaat gebeuren.

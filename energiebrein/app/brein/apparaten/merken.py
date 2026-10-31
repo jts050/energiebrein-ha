@@ -662,6 +662,52 @@ class DeyeSolarman:
             raise NietToegestaan("Aftoppen is voor Deye niet gekoppeld.")
 
 
+class Solis:
+    """Solis hybride omvormers (S6-EH3P…-H, S5-EH1P…, RHI) via Modbus TCP op de LAN-stick of wifi-stick, poort 502, unit 1.
+    Alleen uitlezen. Registers (input, functiecode 4) volgens het Solis RS485-Modbus-protocol voor hybrides:
+    33057-33058 PV-vermogen (u32, W), 33130-33131 meter (s32, W, + = teruglevering), 33135 accu-richting (0 laden, 1 ontladen),
+    33139 accu-lading (%), 33147 huisverbruik (u16, W), 33149-33150 accuvermogen (s32, W). 32-bits waarden: eerste woord hoogste.
+    Het teken van het accuvermogen is niet bij alle firmware gelijk; daarom bepaalt register 33135 de richting."""
+    kan_sturen = False
+
+    def __init__(self, cfg: dict):
+        o = cfg["omvormer"]
+        self.mb = Modbus(o["host"], int(o.get("modbus_poort", 502)), int(o.get("modbus_unit", 1)))
+
+    @classmethod
+    def voor_test(cls, ip, extra):
+        return cls({"omvormer": {"host": ip, "modbus_poort": extra.get("modbus_poort", 502), "modbus_unit": extra.get("modbus_unit", 1)}})
+
+    async def start(self):
+        await self.mb.open()
+
+    async def stop(self):
+        self.mb.sluit()
+
+    async def lees(self) -> dict:
+        try:
+            r = await self.mb.lees(33130, 21, "input")        # 33130 … 33150 in één keer
+        except IOError:                                       # sommige sticks weigeren een groot blok: dan per register
+            r = [0] * 21
+            for i in (0, 1, 5, 9, 17, 19, 20):
+                r[i] = (await self.mb.lees(33130 + i, 1, "input"))[0]
+        zon = u32(await self.mb.lees(33057, 2, "input"))
+        meter = s32(r[0:2])
+        richting, soc, last, accu = r[5], r[9], r[17], s32(r[19:21])
+        if soc > 100 or richting > 1:
+            raise ValueError("Onverwachte waarden: dit Solis-model gebruikt een andere registerkaart of de stick geeft geen antwoord van de omvormer.")
+        accu_w = abs(accu) * (1 if richting == 0 else -1)      # + = laden
+        net = -meter if meter else last + accu_w - zon         # + = afname; zonder meter volgt het uit de balans
+        return {"zon_kw": max(zon, 0) / 1000, "accu_kw": accu_w / 1000, "accu_soc": float(soc), "net_kw": net / 1000}
+
+    async def accu(self, *a):
+        raise NietToegestaan("Sturen van Solis volgt; nu alleen uitlezen.")
+
+    async def exportlimiet(self, kw):
+        if kw == 0:
+            raise NietToegestaan("Aftoppen is voor Solis niet gekoppeld.")
+
+
 # ============================================================ meters
 class ESPHomeP1:
     """SlimmeLezer of een andere ESPHome-P1-lezer via de native ESPHome-API (bibliotheek 'aioesphomeapi').

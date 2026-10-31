@@ -323,7 +323,7 @@ async def test(soort: str, ip: str, extra: dict | None = None) -> dict:
         driver = {"fronius": echt.Fronius, "sunspec": echt.SunSpec, "homewizard": echt.HomeWizardP1, "youless": echt.Youless,
                   "p1monitor": echt.P1Monitor, "shelly_em": echt.ShellyEM, "goe": echt.GoE, "solaredge": mk.SolarEdge,
                   "sma": mk.SMA, "huawei": mk.Huawei, "victron": mk.Victron, "sungrow": mk.Sungrow, "sessy": mk.Sessy,
-                  "enphase": mk.Enphase, "deye": mk.DeyeSolarman, "esphome": mk.ESPHomeP1, "tibber": mk.TibberPulse,
+                  "enphase": mk.Enphase, "deye": mk.DeyeSolarman, "solis": mk.Solis, "esphome": mk.ESPHomeP1, "tibber": mk.TibberPulse,
                   "tesla": mk.TeslaWallConnector, "easee": mk.Easee}.get(soort)
         if soort == "wpmeter":
             from .apparaten.echt import shelly_vermogen_kw
