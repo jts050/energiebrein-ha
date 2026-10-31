@@ -738,6 +738,107 @@ class Solis:
             raise NietToegestaan("Aftoppen is voor Solis niet gekoppeld.")
 
 
+class SolisCloud:
+    """Solis via SolisCloud (internet), alleen uitlezen. Voor sticks waarvan de lokale poorten dicht staan.
+    Aanvragen: SolisCloud → Basisinstellingen → API-beheer → activeren; daar staan KeyId, KeySecret en het adres.
+    Elke aanvraag is een POST met JSON, ondertekend met HMAC-SHA1 (Solis Monitoring API): Authorization 'API KeyId:Handtekening'.
+    De stick stuurt maar eens per 5 minuten gegevens naar de cloud, dus de waarden lopen tot 5 minuten achter."""
+    kan_sturen = False
+    STANDAARD = "https://www.soliscloud.com:13333"
+    INTERVAL_S = 120
+
+    def __init__(self, cfg: dict):
+        o = cfg["omvormer"]
+        h = (o.get("host") or "").strip().rstrip("/")
+        self.basis = h if h.startswith("http") else (f"https://{h}" if h else self.STANDAARD)
+        self.sleutel = (o.get("gebruiker") or "").strip()
+        self.geheim = (o.get("wachtwoord") or "").strip()
+        self.omkeren = bool(o.get("accu_omkeren", False))
+        self.sn = None
+        self._laatst = 0.0
+        self._cache: dict = {}
+
+    @classmethod
+    def voor_test(cls, ip, extra):
+        return cls({"omvormer": {"host": ip, "gebruiker": extra.get("gebruiker"), "wachtwoord": extra.get("wachtwoord")}})
+
+    async def start(self):
+        if not self.sleutel or not self.geheim:
+            raise ConnectionError("Vul de KeyId (bij gebruiker) en de KeySecret (bij wachtwoord) van SolisCloud in.")
+
+    async def stop(self):
+        return
+
+    async def _post(self, pad: str, body: dict) -> dict:
+        import base64
+        import hashlib
+        import hmac
+        from email.utils import formatdate
+        tekst = json.dumps(body, separators=(",", ":"))
+        md5 = base64.b64encode(hashlib.md5(tekst.encode()).digest()).decode()
+        datum = formatdate(usegmt=True)
+        soort = "application/json"
+        te_tekenen = f"POST\n{md5}\n{soort}\n{datum}\n{pad}"
+        sign = base64.b64encode(hmac.new(self.geheim.encode(), te_tekenen.encode(), hashlib.sha1).digest()).decode()
+        koppen = {"Content-MD5": md5, "Content-Type": soort, "Date": datum, "Authorization": f"API {self.sleutel}:{sign}"}
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as s:
+            async with s.post(self.basis + pad, data=tekst.encode(), headers=koppen) as r:
+                try:
+                    d = await r.json(content_type=None)
+                except Exception:
+                    raise ConnectionError(f"SolisCloud antwoordde met HTTP {r.status} en geen bruikbare gegevens. Klopt het adres?") from None
+        if not d.get("success") or str(d.get("code")) != "0":
+            msg = str(d.get("msg") or d.get("code"))
+            if any(w in msg.lower() for w in ("sign", "auth", "key", "access", "permission")):
+                msg += " (klopt de KeyId en KeySecret, en staat API-toegang aan bij SolisCloud → Basisinstellingen → API-beheer?)"
+            raise ConnectionError(f"SolisCloud: {msg}")
+        return d.get("data") or {}
+
+    @staticmethod
+    def _kw(d: dict, veld: str) -> float:
+        """Waarde in kW; de eenheid staat in <veld>Str (W, kW of MW)."""
+        try:
+            v = float(d.get(veld) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+        eenheid = str(d.get(veld + "Str") or "kW").strip().lower()
+        return v / 1000 if eenheid == "w" else v * 1000 if eenheid == "mw" else v
+
+    async def lees(self) -> dict:
+        if time.monotonic() - self._laatst < self.INTERVAL_S and self._cache:
+            return self._cache
+        if not self.sn:
+            lijst = await self._post("/v1/api/inverterList", {"pageNo": 1, "pageSize": 20})
+            recs = (lijst.get("page") or {}).get("records") or []
+            if not recs:
+                raise ConnectionError("SolisCloud kent geen omvormer op dit account.")
+            self.sn = recs[0].get("sn")
+        d = await self._post("/v1/api/inverterDetail", {"sn": self.sn})
+        soc = d.get("batteryCapacitySoc")
+        if soc is None:
+            raise ValueError("SolisCloud geeft geen accugegevens voor deze omvormer (geen hybride omvormer of accu?).")
+        pv = 0.0
+        for i in range(1, 33):                                # gelijkstroom van de panelen: spanning × stroom per string
+            u, a = d.get(f"uPv{i}"), d.get(f"iPv{i}")
+            if u is not None and a is not None:
+                pv += float(u or 0) * float(a or 0) / 1000
+        if not pv:
+            pv = max(self._kw(d, "pac"), 0.0)                 # val terug op het wisselstroomvermogen
+        accu = self._kw(d, "batteryPower")                    # SolisCloud: negatief = laden, positief = leveren
+        accu_kw = accu if self.omkeren else -accu             # wij: + = laden
+        last = self._kw(d, "familyLoadPower")
+        uit = {"zon_kw": pv, "accu_kw": accu_kw, "accu_soc": float(soc), "net_kw": last + accu_kw - pv}
+        self._cache, self._laatst = uit, time.monotonic()
+        return uit
+
+    async def accu(self, *a):
+        raise NietToegestaan("Sturen via SolisCloud kan niet; nu alleen uitlezen.")
+
+    async def exportlimiet(self, kw):
+        if kw == 0:
+            raise NietToegestaan("Aftoppen is via SolisCloud niet mogelijk.")
+
+
 # ============================================================ meters
 class ESPHomeP1:
     """SlimmeLezer of een andere ESPHome-P1-lezer via de native ESPHome-API (bibliotheek 'aioesphomeapi').

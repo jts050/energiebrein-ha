@@ -82,7 +82,7 @@ class Huis:
         from . import merken as mk
         omv = {"goodwe": echt.GoodWe, "fronius": mk.FroniusGen24, "sunspec": echt.SunSpec, "solaredge": mk.SolarEdge,
                "sma": mk.SMA, "huawei": mk.Huawei, "victron": mk.Victron, "sungrow": mk.Sungrow, "sessy": mk.Sessy,
-               "enphase": mk.Enphase, "deye": mk.DeyeSolarman, "solis": mk.Solis}.get(cfg["omvormer"].get("type"))
+               "enphase": mk.Enphase, "deye": mk.DeyeSolarman, "solis": mk.Solis, "solis_cloud": mk.SolisCloud}.get(cfg["omvormer"].get("type"))
         if omv:
             self.omvormer = omv(cfg)
         p1 = {"homewizard": echt.HomeWizardP1, "youless": echt.Youless, "p1monitor": echt.P1Monitor,
@@ -108,7 +108,7 @@ class Huis:
                     "warmtepomp": "Simulatie" if self.cfg["warmtepomp"].get("type") != "uit" else None}
         namen = {"GoodWe": "GoodWe", "Fronius": "Fronius", "FroniusGen24": "Fronius", "SunSpec": "SunSpec (Modbus)", "SolarEdge": "SolarEdge",
                  "SMA": "SMA", "Huawei": "Huawei", "Victron": "Victron", "Sungrow": "Sungrow", "Sessy": "Sessy", "Enphase": "Enphase",
-                 "DeyeSolarman": "Deye (Solarman)", "Solis": "Solis", "ESPHomeP1": "ESPHome P1-lezer", "TibberPulse": "Tibber Pulse",
+                 "DeyeSolarman": "Deye (Solarman)", "Solis": "Solis", "SolisCloud": "Solis (SolisCloud)", "ESPHomeP1": "ESPHome P1-lezer", "TibberPulse": "Tibber Pulse",
                  "TeslaWallConnector": "Tesla Wall Connector", "Easee": "Easee (via account)", "HomeWizardP1": "HomeWizard P1",
                  "Youless": "Youless", "P1Monitor": "P1 Monitor", "ShellyEM": "Shelly EM", "OCPPLaadpaal": "OCPP 1.6",
                  "GoE": "go-e Charger", "SGReadyShelly": "SG-ready"}

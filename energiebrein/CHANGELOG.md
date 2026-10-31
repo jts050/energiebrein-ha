@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.14.0
+
+- **Solis via SolisCloud (alleen uitlezen).** Voor Solis-sticks waarvan de lokale poorten dicht staan. Maak bij SolisCloud → Basisinstellingen → API-beheer de API-toegang aan, en vul bij Koppelen → Omvormer de KeyId en KeySecret in. Het brein leest zon, accu en huisverbruik uit de cloud en leert zo je huis. De gegevens lopen tot 5 minuten achter, omdat de stick maar eens per 5 minuten uploadt. Staat laden en leveren van de accu omgekeerd, zet dan "Laden en leveren omdraaien" aan.
+
 ## 1.13.2
 
 - **Solis met wifi-stick.** Geeft de stick geen antwoord op poort 502, vul dan bij Koppelen het serienummer van de wifi-stick in (alleen cijfers, staat op de stick). Het brein praat dan via de Solarman-route op poort 8899, met dezelfde registers.
