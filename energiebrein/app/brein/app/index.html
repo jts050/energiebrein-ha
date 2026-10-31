@@ -798,7 +798,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         <p class="note" id="zoekstatus"></p>
         <ul class="found" id="found"></ul>
 
-        <form id="kform" class="lijst" autocomplete="off">
+        <form id="kform" class="lijst" autocomplete="off" novalidate>
       <details class="onderdeel" name="kdeel" data-deel="omvormer">
         <summary><span class="ico" style="background:color-mix(in srgb,var(--accu) 16%,transparent);color:var(--accu)"><svg><use href="#i-accu"/></svg></span><span class="wat"><b>Omvormer en thuisaccu</b><span class="stand" id="st-omvormer">Nog niet gekoppeld</span></span><i class="lamp" id="lamp-omvormer"></i><svg class="pijl" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="inhoud">
@@ -1682,6 +1682,15 @@ $('zoek').onclick=async()=>{
   $('zoek').disabled=false;};
 $('catalogus').addEventListener('toggle',laadCatalogus);
 $('kform').addEventListener('submit',async e=>{e.preventDefault();
+  /* Eigen controle in plaats van die van de browser: de browser blokkeert stil als het foute veld in een ingeklapt onderdeel zit.
+     Alleen waarden buiten het bereik of geen getal worden geweigerd; een afrondingsverschil (bijv. 52,0907 bij stap 0,01) is geen fout. */
+  for(const el of $('kform').querySelectorAll('input[type=number]')){
+    const v=el.validity;if(!(v.rangeOverflow||v.rangeUnderflow||v.badInput))continue;
+    const d=el.closest('details');if(d)d.open=true;
+    const naam=(el.closest('label')?.firstChild?.textContent||el.getAttribute('aria-label')||el.id).trim();
+    $('opslaan').hidden=false;$('bewaarstatus').className='res bad';
+    $('bewaarstatus').textContent=`Controleer "${naam}": ${v.badInput?'dit is geen getal':v.rangeUnderflow?'minimaal '+el.min:'maximaal '+el.max}.`;
+    el.scrollIntoView({block:'center'});el.focus();return;}
   const n=id=>parseFloat($(id).value), c=K.instellingen;
   const data={simulatie:$('k-sim').checked,
     locatie:{breedte:n('k-lat'),lengte:n('k-lon')},

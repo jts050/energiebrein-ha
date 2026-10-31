@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.13.1
+
+- **Opslaan en herstarten deed soms niets.** De browser blokkeerde het opslaan stil als een getalveld in een ingeklapt onderdeel een waarde had die niet bij de stapgrootte paste (bijvoorbeeld een breedtegraad met vier decimalen). Nu slaat het gewoon op. Staat er echt iets fout (buiten het bereik of geen getal), dan klapt het onderdeel open en zie je welk veld het is.
+
 ## 1.13.0
 
 - **Solis hybride omvormers (alleen uitlezen).** Bij Koppelen → Omvormer kies je "Solis hybride" en vul je het IP-adres van de omvormer of de LAN-stick in (poort 502, unit 1). Het brein leest zon, accu (percentage en vermogen) en huisverbruik, en het net als er een meter op de omvormer zit. Sturen volgt als het uitlezen bij jou klopt.
