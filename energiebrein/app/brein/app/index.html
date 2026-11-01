@@ -414,8 +414,8 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 .storing b{font-weight:600}
 
 /* ---------- thuis (stijl A) ---------- */
-.nu{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,420px);gap:20px 64px;align-items:start;max-width:1120px}
-@media (max-width:980px){.nu{grid-template-columns:1fr}}
+.nu{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,34%,420px);gap:20px clamp(28px,4.5vw,64px);align-items:start;max-width:1120px}
+@media (max-width:1080px){.nu{grid-template-columns:1fr}}
 .nu-links,.nu-rechts{display:flex;flex-direction:column;min-width:0}
 .nu-rechts{gap:34px;padding-top:8px}
 .nu-kop{display:flex;justify-content:space-between;align-items:baseline;color:var(--muted);font-weight:500;font-size:15px}
@@ -608,7 +608,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 .leerweek table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13.5px}.leerweek th,.leerweek td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.leerweek th:first-child,.leerweek td:first-child{text-align:left}.leerweek th{color:var(--muted);font-weight:600;font-size:12px}.leerweek td.goed{color:var(--good);font-weight:600}.leerweek td.af{color:var(--bad);font-weight:600}.leerweek .feit{margin:0 0 10px;font-size:15px}.leerweek .feit span{display:block;font-size:13px;color:var(--muted)}
 .klemtest-uit{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:8px 0;font-size:14px}.klemtest-uit.goed{border-color:var(--good)}.klemtest-uit.fout{border-color:var(--bad)}.klemtest-uit,.klemtest-uit li,.klemtest-uit b{color:var(--ink)}.klemtest-uit ul{margin:6px 0 0;padding-left:18px}.klemtest-uit li{margin:3px 0}
 /* tablet staand: schema groter en in het midden, lijsten over de hele breedte */
-@media (min-width:600px) and (max-width:980px){.stroom svg{max-width:min(100%,620px);margin:0 auto}.straks-sectie,.spark-sectie{max-width:none}}
+@media (min-width:600px) and (max-width:1080px){.stroom svg{max-width:min(100%,620px);margin:0 auto}.straks-sectie,.spark-sectie{max-width:none}}
 .vg-kop{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:14px 0 2px;font-size:14px}.vg-kop span{color:var(--muted);font-size:13px}
 .cijfer.slecht b{color:var(--bad)}
 .tb-zin{margin:4px 0 10px;line-height:1.5}.tb-score{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted)}.tb-score b{color:var(--ink)}.tb-balk{flex:0 0 120px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}.tb-balk i{display:block;height:100%;background:var(--accu);border-radius:4px}.tb-tips{margin:10px 0 0;padding-left:18px;font-size:14px;line-height:1.5}.tb-tips li{margin:4px 0}
@@ -620,17 +620,17 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 .kosten-dag{font-size:14px;color:var(--muted);margin:10px 0 0;min-height:2.6em}.kosten-dag b{color:var(--ink)}.kosten-blok .staafjes i{cursor:pointer}.kosten-blok .staafjes i.kies{outline:2px solid var(--ink);outline-offset:1px}
 .tabelwrap{overflow-x:auto}.kosten-tabel{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}.kosten-tabel th,.kosten-tabel td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.kosten-tabel th:first-child,.kosten-tabel td:first-child{text-align:left}.kosten-tabel th{color:var(--muted);font-weight:600;font-size:12.5px}.kosten-tabel td.plus{color:var(--good);font-weight:600}.kosten-tabel td.min{color:var(--bad);font-weight:600}
 /* thuis: de dag tot nu toe */
-.dag-sectie{margin-top:34px}
+.dag-sectie{margin-top:34px;container-type:inline-size}
 .dag-tegels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
 .tegel{border:1px solid var(--line);border-radius:14px;padding:11px 12px 10px;min-width:0}
 .tegel i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:0}
-.tegel b{display:block;font-size:19px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
-.tegel b small{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:3px}
+.tegel b{display:block;font-size:19px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.tegel b .n{display:inline;font-size:inherit;color:var(--ink);margin:0;line-height:inherit;white-space:nowrap}
+.tegel b small{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0}
 .tegel span{display:block;font-size:12px;color:var(--muted);margin-top:2px;line-height:1.3}
-@media (max-width:560px){.dag-tegels{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container (max-width:640px){.dag-tegels{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .dag svg{touch-action:pan-y;cursor:crosshair}
 .tegel em{font-style:normal;color:var(--faint)}
-.tegel b{font-size:18px}
+.tegel b{font-size:17.5px}
 .dag-uit{min-height:1.5em;font-size:13px;color:var(--muted);margin:8px 0 0;font-variant-numeric:tabular-nums}.dag-uit b{color:var(--ink);font-weight:600}
 .spark .sv i.lijn{width:14px;height:0;border-radius:0;border-top:2px solid var(--ink);vertical-align:3px;background:none}
 .spark .sv i.stip2{width:14px;height:0;border-radius:0;border-top:2px dashed var(--accu);vertical-align:3px;background:none}
@@ -1285,7 +1285,7 @@ function renderDag(){
   const laad=som(x=>Math.max(x.accu_kwh||0,0)),leve=som(x=>Math.max(-(x.accu_kwh||0),0));
   tg.innerHTML=[['var(--zon)',nf(zon,1),'kWh','zon opgewekt'],['var(--huis)',nf(verb,1),'kWh','verbruik van je huis'],
     ['var(--net)',`${nf(af,1)} / ${nf(terug,1)}`,'kWh','van het net / teruggeleverd'],['var(--accu)',`${nf(laad,1)} / ${nf(leve,1)}`,'kWh','accu geladen / geleverd']]
-    .map(([c,w,e,l],i)=>`<div class="tegel"><b>${w}<small>${e}</small></b><span><i style="background:${c}"></i>${l}${i===0&&zonToek>0.1?`<br><em>nog ${nf(zonToek,1)} kWh verwacht</em>`:''}</span></div>`).join('');
+    .map(([c,w,e,l],i)=>`<div class="tegel"><b><span class="n">${w}</span> <small>${e}</small></b><span><i style="background:${c}"></i>${l}${i===0&&zonToek>0.1?`<br><em>nog ${nf(zonToek,1)} kWh verwacht</em>`:''}</span></div>`).join('');
   if(P4.length<2){el.innerHTML='<p class="klein">Je dag verschijnt hier zodra het brein een paar kwartier heeft gemeten.</p>';return;}
   const W=440,H=118,PL=2,PR=2,T=10,B=6,bodem=H-B;
   const hoog=Math.max(...P4.concat(TK).map(p=>Math.max(p.zon,p.verb,0)),0.5),stap=[1,2,3,4,6,8,10,12,15,20,25,30].find(v=>v>=hoog*1.05)||Math.ceil(hoog);

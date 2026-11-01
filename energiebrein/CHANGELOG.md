@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.15.1
+
+- **Thuis op een pc of laptop met een middelgroot scherm.** Bij vensters rond de 1000 tot 1300 pixels breed werd de linkerkolom zo smal dat de tegels van "Vandaag" over elkaar vielen en het schema klein werd. De rechterkolom is nu smaller en schaalt mee, onder 1080 pixels staat alles onder elkaar, en de tegels zetten zichzelf in twee rijen als er te weinig ruimte is.
+
 ## 1.15.0
 
 - **Thuis: "Vandaag" met dagkromme.** Onder de uitleg van het brein staat nu je dag tot nu toe: zon opgewekt (met wat er nog verwacht wordt), verbruik van je huis, wat je van het net haalde en teruglevert, en hoeveel de accu laadde en leverde. Eronder een grafiek van zon, verbruik en lading van de accu over de hele dag; rechts van "nu" zie je gestippeld wat het brein nog verwacht. Beweeg over de grafiek (of tik erop) om per kwartier de waarden te zien.
