@@ -16,6 +16,9 @@ from datetime import datetime, timedelta, time, timezone
 from .model import Kwartier, Bediening
 
 Q = 0.25  # uur per kwartier
+# Drie punten die samen gemiddelde en spreiding van een onzekere voorspelling goed benaderen (Gauss-Hermite): een lage,
+# een gemiddelde en een hoge uitkomst, met hun kans.
+SCENARIO = [(-math.sqrt(3), 1 / 6), (0.0, 2 / 3), (math.sqrt(3), 1 / 6)]
 
 
 @dataclass
@@ -55,6 +58,9 @@ class Planner:
         self.ondergrens: float | None = None   # ondergrens die de omvormer zelf hanteert (%), als die hoger is
         self.storm: dict = {}                  # kwartier-start → reden (onweer, windstoten): dan de accu vol houden
         self.eind_soc: float | None = None     # alleen voor de terugblik: eindig met deze lading (%), dan is de vergelijking eerlijk
+        # Hoeveel de voorspelling van zon en huisverbruik er gemiddeld naast zit (relatief, bijv. 0.25 = 25%). Het plan rekent dan
+        # met een lage, gemiddelde en hoge uitkomst en kiest wat gemiddeld het goedkoopst is, in plaats van op één gok te bouwen.
+        self.onzekerheid: dict = {}
         self._e_start = 0.0
         self._eindwaarde = 0.0
 
@@ -73,6 +79,41 @@ class Planner:
         return {"kwartieren": kw, "samenvatting": self._samenvatting(kw, soc_nu)}
 
     # ---------------------------------------------------------------
+    def _scenarios(self, k: Kwartier, t: int) -> list[tuple[float, float]]:
+        """(kans, afwijking in netverbruik in kWh) per uitkomst. Hoe verder vooruit, hoe onzekerder; het eerstvolgende uur is
+        bijna zeker, na ongeveer 6 uur geldt de volle spreiding."""
+        sz = max(float(self.onzekerheid.get("zon") or 0.0), 0.0)
+        sh = max(float(self.onzekerheid.get("huis") or 0.0), 0.0)
+        if sz <= 0 and sh <= 0:
+            return [(1.0, 0.0)]
+        schaal = min(1.0, 0.25 + t * Q / 8)
+        uit = []
+        for zi, wz in SCENARIO:
+            fz = max(0.0, 1 + sz * schaal * zi) if k.zon_kwh > 1e-9 and sz > 0 else 1.0
+            for hi, wh in SCENARIO:
+                fh = max(0.0, 1 + sh * schaal * hi) if k.huis_kwh > 1e-9 and sh > 0 else 1.0
+                uit.append((wz * wh, k.huis_kwh * (fh - 1) - k.zon_kwh * (fz - 1)))
+        return uit
+
+    def verwachte_kosten(self, kw: list[Kwartier]) -> float:
+        """Wat een gemaakt plan gemiddeld kost over alle uitkomsten (alleen voor tests en de terugblik), inclusief wat de lading
+        aan het eind nog waard is."""
+        c = self.cfg["accu"]
+        eta = math.sqrt(c["rendement"])
+        slijtage = float(c.get("slijtage_per_kwh", 0.02))
+        min_winst = max(float(c.get("min_winst_per_kwh", 0.0) or 0.0), 0.0)
+        aftoppen_mag = self.cfg.get("omvormer", {}).get("aftoppen_bij_negatieve_prijs", True)
+        totaal = 0.0
+        for t, k in enumerate(kw):
+            d = k.accu_kwh
+            terug = 0.0 if (aftoppen_mag and k.teruglever < 0) else k.teruglever
+            for w, delta in self._scenarios(k, t):
+                g = k.huis_kwh + k.wp_kwh + k.auto_kwh - k.zon_kwh + delta + (d / eta if d > 0 else d * eta)
+                totaal += w * (g * k.inkoop if g > 0 else g * terug)
+            if d > 0:
+                totaal += d * (slijtage + (min_winst if k.inkoop >= 0 else 0.0))
+        return totaal - kw[-1].soc_na / 100 * float(c["capaciteit_kwh"]) * self._eindwaarde
+
     @staticmethod
     def _marginaal(k: Kwartier, extra: float = 0.0) -> float:
         """Wat een extra kWh in dit kwartier ongeveer kost: teruglevertarief bij overschot, anders inkoop."""
@@ -253,7 +294,14 @@ class Planner:
             terug = 0.0 if (aftoppen_mag and k.teruglever < 0) else k.teruglever
             # Krijg je geld voor stroom (negatieve inkoopprijs), dan geen extra winstdrempel: elke kWh erin levert al op.
             slijt = slijtage + (min_winst if k.inkoop >= 0 else 0.0)
-            kost = np.where(g > 0, g * k.inkoop, g * terug) + np.where(d > 0, d * slijt, 0.0)   # per keuze, incl. slijtage
+            scen = self._scenarios(k, t)
+            if len(scen) == 1:
+                kost = np.where(g > 0, g * k.inkoop, g * terug) + np.where(d > 0, d * slijt, 0.0)   # per keuze, incl. slijtage
+            else:
+                kost = np.where(d > 0, d * slijt, 0.0)
+                for w, delta in scen:                                           # gemiddeld over lage, gemiddelde en hoge uitkomst
+                    gs = g + delta
+                    kost = kost + w * np.where(gs > 0, gs * k.inkoop, gs * terug)
             doel = idx[:, None] + deltas[None, :]                              # (N+1, keuzes)
             geldig = (doel >= 0) & (doel <= N)
             if not verkopen:

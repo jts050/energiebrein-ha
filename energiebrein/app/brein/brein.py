@@ -46,6 +46,9 @@ class Brein:
         self.bed = Bediening(auto_doel_kwh=lp.get("standaard_doel_kwh", 20), auto_vertrek=lp.get("standaard_vertrek", "07:30"))
         from .autoplan import AutoPlan
         self.autoplan = AutoPlan(data_map(cfg) / "auto.json")
+        from .vertrek import VertrekLeren
+        self.vertrek = VertrekLeren(data_map(cfg) / "vertrek.json")
+        self.autoplan.geleerd = self.vertrek.week()
         self._bed_pad = data_map(cfg) / "bediening.json"
         try:   # je keuzes in Bediening overleven een herstart
             import json as _j
@@ -141,6 +144,7 @@ class Brein:
         auto = AutoStatus(verbonden=bool(m and m.auto_verbonden), geladen_kwh=self.auto_geladen(m))
         self.planner.ondergrens = self._omvormer_grens()
         self.planner.storm = self.stormkwartieren(kw)
+        self.planner.onzekerheid = self.voorsp.planner_onzekerheid()
         self.plan = self.planner.maak(kw, m.accu_soc if m else 50.0, self.bed, auto, self.voorsp.wp_dag_kwh)
         if getattr(self, "_auto_net_aan", False):
             self._auto_net_aan = False
@@ -282,7 +286,8 @@ class Brein:
                "geladen_kwh": round(self.auto_geladen(), 1), "nog_kwh": round(nodig, 1), "vertrek": self.bed.auto_deadline,
                "bron": getattr(self, "_auto_bron", "schema"), "zonder_vertrek": self.bed.auto_zonder, "laadpaal": self.bed.laadpaal,
                "gepland_kwh": 0.0, "kosten": 0.0, "zon_kwh": 0.0, "van": None, "tot": None, "haalt_doel": True,
-               "plan": self.autoplan.dict(), "auto": self.autoacc.status(), "doel_pct": self._auto_pct_doel}
+               "plan": self.autoplan.dict(), "auto": self.autoacc.status(), "doel_pct": self._auto_pct_doel,
+               "vertrek_geleerd": self.vertrek.status()}
         if ks:
             zon = sum(min(k.auto_kwh, max(k.zon_kwh - k.huis_kwh - k.wp_kwh, 0.0)) for k in ks)
             kosten = sum(min(k.auto_kwh, max(k.zon_kwh - k.huis_kwh - k.wp_kwh, 0.0)) * k.teruglever
@@ -400,6 +405,12 @@ class Brein:
         m = await self.huis.lees()
         vorige_verbonden = self.meting.auto_verbonden if self.meting else False
         self.meting = m
+        try:
+            if self.vertrek.zie(datetime.now(timezone.utc), bool(m.auto_verbonden)):
+                self.autoplan.geleerd = self.vertrek.week()
+                self.logboek.schrijf("systeem", f"Auto vertrokken: het brein kent nu {len(self.vertrek.vertrekken)} vertrekmomenten", "laadpaal")
+        except Exception:
+            log.exception("Vertrektijd leren mislukt")
         if m.auto_verbonden != vorige_verbonden:
             if m.auto_verbonden and not vorige_verbonden and getattr(self, "_gestart", False):
                 self._auto_net_aan = True             # na het nieuwe plan een melding met de keuze slim of direct laden

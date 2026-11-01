@@ -72,6 +72,10 @@ class Voorspelling:
         self.ai_wp = HuisAI(data / "ai_warmtepomp.pkl", "wp_kwh", "warmtepomp")
         self._ai_cache: dict[datetime, float] = {}
         self._afwijking = 0.0                       # hoeveel het huis nu afwijkt van de voorspelling (kWh/kwartier)
+        self._niveau_f = 1.0                        # is het huis het laatste etmaal duidelijk rustiger of drukker dan normaal? (factor)
+        self._niveau_t: datetime | None = None
+        self._niveau_rijen = 0
+        self.onzekerheid: dict = {"zon": None, "huis": None, "zon_dagen": 0, "huis_uren": 0}   # hoeveel de voorspelling ernaast zit
         self._afwijking_t: datetime | None = None
         self._laatst_getraind: datetime | None = None
 
@@ -172,6 +176,11 @@ class Voorspelling:
             nieuw = max(0.6, min(1.4, gemeten / voorspeld * self.zon_correctie))
             self.zon_correctie = 0.7 * self.zon_correctie + 0.3 * nieuw
         try:
+            vm = self.gesch.voorspellingen(nu - timedelta(days=14), nu)
+        except Exception:
+            vm = []
+        self.onzekerheid = self.leer_onzekerheid(rijen, vm)
+        try:
             import json
             grens = (nu - timedelta(days=10)).isoformat()
             self._zon_pad.write_text(json.dumps({"correctie": round(self.zon_correctie, 4),
@@ -179,6 +188,49 @@ class Voorspelling:
         except Exception as e:
             log.warning("Zoncorrectie bewaren mislukt: %s", e)
         log.info("Geleerd van %d dagen", self.leerdagen)
+
+    def leer_onzekerheid(self, rijen: list[dict], voorspeld: list[dict]) -> dict:
+        """Hoeveel zat de voorspelling er gemiddeld naast? Het plan houdt daar rekening mee (zie Planner.onzekerheid).
+        Zon: gemeten tegenover wat het brein vooraf verwachtte, per kwartier. Huis: per uur opgeteld, want het accuplan let
+        niet op een los kwartier. Te weinig gegevens betekent: geen onzekerheid aannemen (het plan blijft dan zoals het was)."""
+        uit = {"zon": None, "huis": None, "zon_dagen": 0, "huis_uren": 0}
+        fout2 = som2 = 0.0
+        n, dagen = 0, set()
+        for r in rijen:
+            v = self.bewaard_zon.get(r["start"])
+            if v is None or (r.get("n") or 0) < 3 or v < 0.03:
+                continue
+            e = (r.get("zon_kwh") or 0.0) - v
+            fout2, som2, n = fout2 + e * e, som2 + v * v, n + 1
+            dagen.add(r["start"][:10])
+        if n >= 24 and len(dagen) >= 2 and som2 > 0:
+            uit["zon"] = round(max(0.05, min(0.6, math.sqrt(fout2 / som2))), 3)
+            uit["zon_dagen"] = len(dagen)
+        vm = {v["start"]: v.get("huis_kwh") for v in voorspeld}
+        uren: dict[str, list[float]] = defaultdict(lambda: [0.0, 0.0, 0])
+        for r in rijen:
+            v = vm.get(r["start"])
+            if v is None or (r.get("n") or 0) < 3:
+                continue
+            u = uren[r["start"][:13]]
+            u[0] += r.get("huis_kwh") or 0.0
+            u[1] += v
+            u[2] += 1
+        vol = [(a, v) for a, v, k in uren.values() if k == 4]
+        if len(vol) >= 48:
+            gem = sum(a for a, _ in vol) / len(vol)
+            if gem > 0.02:
+                rms = math.sqrt(sum((a - v) ** 2 for a, v in vol) / len(vol))
+                uit["huis"] = round(max(0.05, min(0.5, rms / gem)), 3)
+                uit["huis_uren"] = len(vol)
+        return uit
+
+    def planner_onzekerheid(self) -> dict:
+        """Wat de planner meekrijgt. Met onzekerheid: uit in de instellingen van de accu staat het uit."""
+        stand = self.cfg.get("accu", {}).get("onzekerheid", "auto")
+        if stand is False or str(stand).lower() in ("uit", "nee", "false", "0"):
+            return {}
+        return {k: self.onzekerheid[k] for k in ("zon", "huis") if self.onzekerheid.get(k)}
 
     def bereid(self, tijden: list[datetime]) -> None:
         """Vooraf de AI-voorspelling voor het hele plan uitrekenen, en kijken hoe het huis er nu voor staat."""
@@ -192,16 +244,44 @@ class Voorspelling:
         alles = verleden + list(tijden)
         p = self.ai_huis.voorspel(alles, self.weer)
         self._ai_cache = dict(zip(alles, p)) if p is not None else {}
+        self._bepaal_niveau(recent, nu)
         # nu-correctie: wijkt het huis het afgelopen uur af (gasten, wasmachine, vakantie)? Dan dat de komende uren meenemen.
         if len(verleden) >= 2:
-            fout = [r["huis_kwh"] - self.huis_basis(datetime.fromisoformat(r["start"])) for r in recent[-5:-1]]
+            fout = [r["huis_kwh"] - self.huis_basis(datetime.fromisoformat(r["start"])) * self._niveau_f for r in recent[-5:-1]]
             self._afwijking = sum(fout) / len(fout)
             self._afwijking_t = verleden[-1] + timedelta(minutes=15)
         else:
             self._afwijking, self._afwijking_t = 0.0, None
 
+    def _bepaal_niveau(self, recent: list[dict], nu: datetime) -> None:
+        """Verbruikt het huis het laatste etmaal duidelijk minder of meer dan normaal? Een week weg of gasten over de vloer:
+        het model kent dat niet, want het kijkt vooral naar de afgelopen weken. Duurt het langer dan een paar uur, dan rekent het
+        brein de komende dagen met dat lagere of hogere niveau (en vergeet het weer als je terug bent)."""
+        rijen = [r for r in recent if datetime.fromisoformat(r["start"]) >= nu - timedelta(hours=24)]
+        self._niveau_f, self._niveau_t, self._niveau_rijen = 1.0, nu, len(rijen)
+        if len(rijen) < 48:                                   # minstens 12 uur gemeten
+            return
+        tijden = [datetime.fromisoformat(r["start"]).astimezone(timezone.utc) for r in rijen]
+        p = self.ai_huis.voorspel(tijden, self.weer)
+        if p is not None:
+            voorspeld = float(sum(p))
+        else:
+            voorspeld = sum(self.huis_basis(t) for t in tijden)
+        if voorspeld < 0.5:
+            return
+        ratio = sum(r.get("huis_kwh") or 0.0 for r in rijen) / voorspeld
+        f = 1 + (ratio - 1) * min(1.0, len(rijen) / 96)
+        f = max(0.4, min(1.8, f))
+        self._niveau_f = 1 + math.copysign(max(abs(f - 1) - 0.1, 0.0), f - 1)    # kleine verschillen negeren, geen sprong op de grens
+
+    def _niveau_op(self, t: datetime) -> float:
+        if self._niveau_t is None or self._niveau_f == 1.0:
+            return 1.0
+        uren = max((t - self._niveau_t).total_seconds() / 3600, 0.0)
+        return 1 + (self._niveau_f - 1) * 0.5 ** (uren / 36)     # na anderhalve dag nog de helft: je kunt terugkomen
+
     def huis_kwh(self, t: datetime) -> float:
-        basis = self.huis_basis(t)
+        basis = self.huis_basis(t) * self._niveau_op(t)
         if self._afwijking_t is not None:
             stappen = max((t - self._afwijking_t).total_seconds() / 900, 0)
             basis += self._afwijking * 0.75 ** stappen   # dooft uit over een paar uur
@@ -240,4 +320,7 @@ class Voorspelling:
                 "zon_correctie": round(self.zon_correctie, 2), "weer_bron": self.weer.bron,
                 "temp_nu": round(self.weer.op(datetime.now(timezone.utc)), 1),
                 "afwijking_nu_kw": round(self._afwijking * 4, 2),
+                "niveau": {"factor": round(self._niveau_f, 2), "rustig": self._niveau_f <= 0.75 and self._niveau_rijen >= 72,
+                           "druk": self._niveau_f >= 1.3 and self._niveau_rijen >= 72},
+                "onzekerheid": {**self.onzekerheid, "gebruikt": self.planner_onzekerheid()},
                 "ai_huis": self.ai_huis.rapport, "ai_warmtepomp": self.ai_wp.rapport if self.cfg.get("warmtepomp", {}).get("type", "uit") != "uit" else None}

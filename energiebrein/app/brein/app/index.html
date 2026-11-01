@@ -764,6 +764,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
             <div class="ap-pil"><span>Klaar om</span><b id="ap-k-week">–</b></div>
             <div class="ap-knoppen"><button class="btn klein" type="button" id="ap-open">Schema aanpassen</button><button class="btn klein" type="button" id="ap-e-open">Eenmalig anders</button></div>
           </div>
+          <p class="klein" id="ap-geleerd" hidden></p>
           <form id="autoform" class="autoplan" hidden>
             <div class="ap-veld"><span class="ap-label">Hoeveel erbij</span>
               <div class="ap-doel"><input id="ap-doel" type="number" min="0" max="1000" step="5" aria-label="Doel"><div class="keuze klein" id="ap-soort"><button type="button" data-s="pct">tot %</button><button type="button" data-s="km">km</button><button type="button" data-s="kwh">kWh</button></div><span class="note" id="ap-doel-uitleg"></span></div></div>
@@ -1357,6 +1358,11 @@ function renderAI(v){
     f.push([`${nf(a.kwh_per_dag)} kWh per dag`,`zonder auto en warmtepomp. Het drukst om ${a.piekuren.map(h=>h+':00').join(', ')}`]);
   }else f.push([esc(a.status||'Start op'),'Na 7 dagen meten leert een AI-model je huis kennen. Tot die tijd rekent het brein met een gemiddelde.']);
   if(w&&w.status==='actief')f.push([`+${nf(w.kwh_per_graad)} kWh per graad kouder`,'zoveel meer stookt je warmtepomp per dag']);
+  const nv=v.niveau||{},on=v.onzekerheid||{};
+  if(nv.rustig)f.push([`Rustig in huis: ${nf((1-nv.factor)*100,0)}% minder verbruik`,'dan normaal het laatste etmaal. Het brein plant de komende dagen met dat lagere niveau en gaat vanzelf terug naar normaal als je terug bent.']);
+  else if(nv.druk)f.push([`Druk in huis: ${nf((nv.factor-1)*100,0)}% meer verbruik`,'dan normaal het laatste etmaal. Het brein houdt daar de komende dagen rekening mee.']);
+  if(on.gebruikt&&on.gebruikt.zon)f.push([`Zon: gemiddeld ${nf(on.gebruikt.zon*100,0)}% ernaast`,`gemeten over ${on.zon_dagen} dagen. Het brein plant niet op één gok maar kiest wat bij lage, gemiddelde en hoge opbrengst samen het goedkoopst is`+(on.gebruikt.huis?`; hetzelfde voor het huisverbruik (${nf(on.gebruikt.huis*100,0)}% per uur).`:'.')]);
+  else if(on.zon==null)f.push(['Zon: nog aan het leren','Na twee dagen metingen weet het brein hoe goed de zonvoorspelling bij jouw dak past en houdt daar rekening mee.']);
   f.push([`${nf(v.temp_nu)} °C buiten`,v.weer_bron==='Open-Meteo'?'actueel weer':'geschat, geen weerdata']);
   if(Math.abs(v.afwijking_nu_kw)>=0.1)f.push([`${v.afwijking_nu_kw>0?'+':'−'}${nf(Math.abs(v.afwijking_nu_kw))} kW t.o.v. verwachting`,'het plan houdt daar de komende uren rekening mee']);
   let prof='<p class="klein">Hier verschijnt je dagpatroon zodra de AI actief is.</p>';
@@ -1549,6 +1555,14 @@ function renderAuto(){
   $('ap-k-week').textContent=actief?`${kort(e.vertrek)} (eenmalig), daarna ${weekTekst(p.week)}`:weekTekst(p.week);
   $('ap-e-open').textContent=actief?'Eenmalig verwijderen':'Eenmalig anders';
   if(!APOPEN&&$('autoform').hidden)APSOORT=p.doel_soort;
+  // wat het brein zelf over je vertrektijden geleerd heeft
+  const vg=A.vertrek_geleerd||{},gl=$('ap-geleerd'),dagen=Object.entries(vg.week||{});
+  if(!dagen.length)gl.innerHTML=vg.aantal?`Het brein leert wanneer je vertrekt (${vg.aantal} keer gezien). Na een paar keer per dag gebruikt het die tijden zelf.`:'';
+  else if(p.geleerd_actief)gl.innerHTML=`Het brein heeft geleerd wanneer je vertrekt: ${weekTekst(vg.week)}. Die tijden gebruikt het nu. <a href="#" id="ap-eigen">Zelf instellen</a>`;
+  else gl.innerHTML=`Het brein ziet dat je meestal vertrekt: ${weekTekst(vg.week)}. Jouw eigen schema geldt nu. <a href="#" id="ap-leer">Laat het brein de tijden zelf kiezen</a>`;
+  gl.hidden=!gl.innerHTML;
+  if($('ap-eigen'))$('ap-eigen').onclick=e=>{e.preventDefault();APOPEN=true;vulEditor();$('autoform').hidden=false;$('ap-eenmalig').hidden=true;$('ap-open').hidden=true;};
+  if($('ap-leer'))$('ap-leer').onclick=e=>{e.preventDefault();apStuur({eigen:false});};
 }
 $('ap-open').onclick=()=>{APOPEN=true;vulEditor();$('autoform').hidden=false;$('ap-eenmalig').hidden=true;$('ap-open').hidden=true;};
 $('ap-dicht').onclick=()=>{APOPEN=false;$('autoform').hidden=true;$('ap-open').hidden=false;};

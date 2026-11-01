@@ -191,6 +191,8 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
             B().logboek.schrijf("handmatig", (f"Auto: eenmalig {e['doel']:.0f} {e['doel_soort']} klaar op "
                                               f"{datetime.fromisoformat(e['vertrek']).strftime('%d-%m %H:%M')}") if e else
                                 "Auto: eenmalige uitzondering verwijderd", "laadpaal")
+        elif set(d) == {"eigen"}:
+            B().logboek.schrijf("handmatig", "Auto: het brein " + ("gebruikt weer je eigen schema" if ap.get("eigen") else "leert de vertrektijden zelf"), "laadpaal")
         else:
             B().logboek.schrijf("handmatig", "Auto: laadschema aangepast (" + ", ".join(f"{dag} {t}" for dag, t in ap["week"].items() if t)
                                 + f"; doel {ap['doel_' + ap['doel_soort']]:.0f} {ap['doel_soort']})", "laadpaal")

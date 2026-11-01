@@ -1,5 +1,11 @@
 # Wat er nieuw is
 
+## 1.16.0
+
+- **Het brein plant met onzekerheid.** Het brein meet hoe vaak de zonvoorspelling en het huisverbruik er bij jou naast zitten, en rekent daarna niet meer op één gok. Het plan kijkt naar een lage, gemiddelde en hoge uitkomst en kiest wat samen het goedkoopst is. Het eerstvolgende uur telt bijna als zeker, na ongeveer 6 uur geldt de volle onzekerheid. Je ziet wat het brein geleerd heeft bij Plan, onder "Wat het brein over je huis weet". Tot er twee dagen metingen zijn, plant het zoals voorheen. Uitzetten kan met `onzekerheid: uit` bij de accu-instellingen.
+- **Het brein merkt dat je weg bent (of gasten hebt).** Verbruikt het huis het laatste etmaal duidelijk minder of meer dan normaal, dan rekent het brein de komende dagen met dat niveau en gaat het vanzelf terug naar normaal als het verbruik weer gewoon wordt. Kleine verschillen worden genegeerd.
+- **De auto-vertrektijd leert het brein zelf.** Elke keer dat de stekker er na minstens anderhalf uur uit gaat, onthoudt het brein de weekdag en het tijdstip. Na drie keer op dezelfde dag (of acht keer op werkdagen samen) gebruikt het die tijden, met een veilige marge: een tijd waarop je in een kwart van de gevallen al weg was. Bij Bediening → Auto laden staat wat het geleerd heeft. Heb je zelf een schema opgeslagen, dan blijft dat gelden; met "Laat het brein de tijden zelf kiezen" schakel je het leren weer in.
+
 ## 1.15.1
 
 - **Thuis op een pc of laptop met een middelgroot scherm.** Bij vensters rond de 1000 tot 1300 pixels breed werd de linkerkolom zo smal dat de tegels van "Vandaag" over elkaar vielen en het schema klein werd. De rechterkolom is nu smaller en schaalt mee, onder 1080 pixels staat alles onder elkaar, en de tegels zetten zichzelf in twee rijen als er te weinig ruimte is.

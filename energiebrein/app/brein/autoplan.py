@@ -17,6 +17,7 @@ STANDAARD = {
     "verbruik_kwh_100km": 18,
     "eenmalig": None,              # {"vertrek": iso-tijd, "doel_soort": "km"|"kwh", "doel": getal}
     "zonder_vertrek": "zon",       # wat te doen als er geen vertrek gepland is: zon (alleen op overschot) of goedkoop
+    "eigen": False,                # True zodra je zelf een schema hebt opgeslagen; anders gebruikt het brein wat het zelf leerde
 }
 
 
@@ -33,12 +34,21 @@ class AutoPlan:
     def __init__(self, pad: Path):
         self.pad = pad
         self.d = json.loads(json.dumps(STANDAARD))
+        self.geleerd: dict = {}        # per weekdag de vertrektijd die het brein zelf geleerd heeft (zie vertrek.py)
         try:
             opgeslagen = json.loads(pad.read_text(encoding="utf-8"))
             self.d.update({k: v for k, v in opgeslagen.items() if k in STANDAARD})
             self.d["week"] = {**STANDAARD["week"], **(opgeslagen.get("week") or {})}
+            # een bestand zonder dit veld is door jou opgeslagen (van vóór het leren): dat schema blijft gelden
+            self.d["eigen"] = bool(opgeslagen.get("eigen", True))
         except Exception:
             pass
+
+    def _week(self) -> dict:
+        """Het schema dat nu geldt: dat van jou, of zolang je geen eigen schema hebt opgeslagen wat het brein zelf leerde."""
+        if self.d.get("eigen") or not self.geleerd:
+            return dict(self.d["week"])
+        return {**self.d["week"], **{dag: t for dag, t in self.geleerd.items() if dag in DAGEN}}
 
     def bewaar(self):
         try:
@@ -48,7 +58,11 @@ class AutoPlan:
 
     def zet(self, nieuw: dict) -> None:
         """Controleert en neemt over wat de app stuurt."""
-        week = nieuw.get("week", self.d["week"])
+        if set(nieuw) == {"eigen"}:                               # alleen kiezen: zelf instellen of het brein laten leren
+            self.d["eigen"] = bool(nieuw["eigen"])
+            self.bewaar()
+            return
+        week = nieuw.get("week", self._week())
         for dag in DAGEN:
             _tijd(week.get(dag))                                  # gooit ValueError bij onzin
         soort = nieuw.get("doel_soort", self.d["doel_soort"])
@@ -65,7 +79,7 @@ class AutoPlan:
         if zonder not in ("zon", "goedkoop"):
             raise ValueError("zonder_vertrek moet zon of goedkoop zijn")
         self.d.update({"week": {d: week.get(d) or None for d in DAGEN}, "doel_soort": soort, "doel_km": km, "doel_kwh": kwh, "doel_pct": pct,
-                       "verbruik_kwh_100km": verbruik, "zonder_vertrek": zonder})
+                       "verbruik_kwh_100km": verbruik, "zonder_vertrek": zonder, "eigen": True})
         if "eenmalig" in nieuw:
             e = nieuw["eenmalig"]
             if e:
@@ -105,9 +119,10 @@ class AutoPlan:
         if e:
             return e["tijd"], self._kwh(e["doel_soort"], float(e["doel"])), "eenmalig"
         lokaal = nu.astimezone()
+        week = self._week()
         for i in range(8):
             dag = lokaal.date() + timedelta(days=i)
-            t = _tijd(self.d["week"].get(DAGEN[dag.weekday()]))
+            t = _tijd(week.get(DAGEN[dag.weekday()]))
             if not t:
                 continue
             # via een 'kale' tijd, zodat zomer- en wintertijd per dag goed gaan
@@ -117,4 +132,6 @@ class AutoPlan:
         return None, self._kwh(self.d["doel_soort"], float(self.d.get("doel_" + self.d["doel_soort"], 0))), "geen"
 
     def dict(self) -> dict:
-        return dict(self.d)
+        week = self._week()
+        return {**self.d, "week": week, "geleerd": dict(self.geleerd),
+                "geleerd_actief": bool(self.geleerd) and not self.d.get("eigen") and week != self.d["week"]}

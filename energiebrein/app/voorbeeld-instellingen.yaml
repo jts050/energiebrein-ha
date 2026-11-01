@@ -65,6 +65,7 @@ accu:
   zon_altijd_in_accu: true   # true = zonne-overschot gaat altijd eerst de accu in zolang die ruimte heeft
   stormstand: false          # true = accu vol houden bij onweer of zware windstoten (alleen zinvol met een noodstroomgroep)
   terugverkopen: true        # true = de accu mag stroom aan het net verkopen; false = de accu voedt alleen je eigen huis
+  onzekerheid: auto          # auto = het plan houdt rekening met hoe vaak de zon- en huisvoorspelling ernaast zit; uit = plan op één verwachting
 
 # ---------- Laadpaal (OCPP 1.6) ----------
 laadpaal:
