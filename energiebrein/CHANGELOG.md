@@ -1,5 +1,10 @@
 # Wat er nieuw is
 
+## 1.15.0
+
+- **Thuis: "Vandaag" met dagkromme.** Onder de uitleg van het brein staat nu je dag tot nu toe: zon opgewekt (met wat er nog verwacht wordt), verbruik van je huis, wat je van het net haalde en teruglevert, en hoeveel de accu laadde en leverde. Eronder een grafiek van zon, verbruik en lading van de accu over de hele dag; rechts van "nu" zie je gestippeld wat het brein nog verwacht. Beweeg over de grafiek (of tik erop) om per kwartier de waarden te zien.
+- **Rustende onderdelen zijn beter leesbaar.** Een onderdeel dat niets doet (warmtepomp in rust, auto zonder stekker) was bijna zwart in het schema; het is nu gedempt maar goed te lezen.
+
 ## 1.14.0
 
 - **Solis via SolisCloud (alleen uitlezen).** Voor Solis-sticks waarvan de lokale poorten dicht staan. Maak bij SolisCloud → Basisinstellingen → API-beheer de API-toegang aan, en vul bij Koppelen → Omvormer de KeyId en KeySecret in. Het brein leest zon, accu en huisverbruik uit de cloud en leert zo je huis. De gegevens lopen tot 5 minuten achter, omdat de stick maar eens per 5 minuten uploadt. Staat laden en leveren van de accu omgekeerd, zet dan "Laden en leveren omdraaien" aan.

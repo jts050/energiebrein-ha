@@ -101,7 +101,7 @@ main{min-width:0;padding:max(22px,env(safe-area-inset-top)) max(28px,env(safe-ar
 .stroom .rand{fill:none;stroke-width:2}
 .stroom .waarde{font:800 19px var(--font);fill:var(--ink);letter-spacing:-.02em}
 .stroom .naam{font:600 12.5px var(--font);fill:var(--muted)}
-.stroom .uit{opacity:.35}
+.stroom .uit{opacity:.62}
 .stroom .ring-bg{fill:none;stroke:var(--line);stroke-width:7}
 .stroom .ring{fill:none;stroke:var(--accu);stroke-width:7;stroke-linecap:round;transition:stroke-dasharray .8s}
 .stroom .pct{font:800 30px var(--font);fill:var(--ink);letter-spacing:-.03em}
@@ -619,6 +619,21 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
 .stormbalk{display:flex;gap:12px;align-items:flex-start;border:1px solid color-mix(in srgb,var(--accu) 50%,transparent);border-radius:12px;padding:12px 14px;margin-bottom:14px}.stormbalk .stip{width:10px;height:10px;border-radius:50%;background:var(--accu);margin-top:5px;flex:none}.stormbalk p{margin:2px 0 0;color:var(--muted);font-size:14px}
 .kosten-dag{font-size:14px;color:var(--muted);margin:10px 0 0;min-height:2.6em}.kosten-dag b{color:var(--ink)}.kosten-blok .staafjes i{cursor:pointer}.kosten-blok .staafjes i.kies{outline:2px solid var(--ink);outline-offset:1px}
 .tabelwrap{overflow-x:auto}.kosten-tabel{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}.kosten-tabel th,.kosten-tabel td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.kosten-tabel th:first-child,.kosten-tabel td:first-child{text-align:left}.kosten-tabel th{color:var(--muted);font-weight:600;font-size:12.5px}.kosten-tabel td.plus{color:var(--good);font-weight:600}.kosten-tabel td.min{color:var(--bad);font-weight:600}
+/* thuis: de dag tot nu toe */
+.dag-sectie{margin-top:34px}
+.dag-tegels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.tegel{border:1px solid var(--line);border-radius:14px;padding:11px 12px 10px;min-width:0}
+.tegel i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:0}
+.tegel b{display:block;font-size:19px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tegel b small{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:3px}
+.tegel span{display:block;font-size:12px;color:var(--muted);margin-top:2px;line-height:1.3}
+@media (max-width:560px){.dag-tegels{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.dag svg{touch-action:pan-y;cursor:crosshair}
+.tegel em{font-style:normal;color:var(--faint)}
+.tegel b{font-size:18px}
+.dag-uit{min-height:1.5em;font-size:13px;color:var(--muted);margin:8px 0 0;font-variant-numeric:tabular-nums}.dag-uit b{color:var(--ink);font-weight:600}
+.spark .sv i.lijn{width:14px;height:0;border-radius:0;border-top:2px solid var(--ink);vertical-align:3px;background:none}
+.spark .sv i.stip2{width:14px;height:0;border-radius:0;border-top:2px dashed var(--accu);vertical-align:3px;background:none}
 </style>
 </head>
 <body>
@@ -664,6 +679,9 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
           <div class="brein"><span class="ico" aria-hidden="true"><svg><use href="#i-brein"/></svg></span>
             <div><p class="zin" id="wat">Het brein start op</p><p class="zin2" id="waarom"></p></div></div>
           <p class="zin2" id="kop" hidden></p>
+          <div class="sectie dag-sectie" id="dag-sectie"><h2>Vandaag</h2>
+            <div class="dag-tegels" id="dag-tegels"></div>
+            <div class="spark dag" id="dag"><p class="klein">Even laden…</p></div></div>
           <div class="sectie straks-sectie" id="straks-sectie" hidden><h2>Wat de accu straks doet</h2><ul class="straks" id="straks"></ul></div>
           <div class="sectie spark-sectie"><h2>Prijs komende 24 uur</h2><div class="spark" id="spark"></div></div>
         </div>
@@ -1245,6 +1263,57 @@ function renderStatus(){
   $('apps').innerHTML=Object.entries(namen).map(([k,n])=>{const f=Object.entries(S.fouten||{}).find(([x])=>x.startsWith(k)),mld=(S.meldingen||{})[k];
     return `<div class="cijfer"><b>${a[k]?esc(a[k]):'Niet gekoppeld'}</b><span>${n}${f?`. <span class="fout">${esc(f[1])}</span>`:''}${mld&&!f?`. ${esc(mld)}`:''}</span></div>`;}).join('');
 }
+/* ---------- thuis: de dag tot nu toe ---------- */
+let DAG=null;
+async function laadDag(){
+  try{const nu=new Date(),mid=new Date(nu);mid.setHours(0,0,0,0);
+    const r=await api(`/api/geschiedenis?uren=${Math.ceil((nu-mid)/36e5)+2}`);
+    DAG={mid,rijen:r.filter(x=>new Date(x.start)>=mid)};renderDag();}catch(e){}}
+function renderDag(){
+  const el=$('dag'),tg=$('dag-tegels');if(!el||!DAG)return;
+  const R=DAG.rijen,nu=new Date(),mid=DAG.mid,eind=new Date(mid);eind.setDate(eind.getDate()+1);const span=eind-mid;
+  const som=f=>R.reduce((a,x)=>a+(f(x)||0),0);
+  const zon=som(x=>x.zon_kwh),verb=som(x=>(x.huis_kwh||0)+(x.wp_kwh||0)+(x.auto_kwh||0)),af=som(x=>x.afname_kwh),terug=som(x=>x.terug_kwh);
+  // vermogen per kwartier; het kwartier dat nog loopt delen we door de tijd die er echt van voorbij is
+  const P4=[];
+  for(const x of R){const t0=new Date(x.start),uur=Math.min(0.25,(nu-t0)/36e5);if(uur<0.03)continue;const f=1/uur;
+    P4.push({t:t0.getTime()+uur*18e5,zon:(x.zon_kwh||0)*f,verb:((x.huis_kwh||0)+(x.wp_kwh||0)+(x.auto_kwh||0))*f,net:(x.net_kwh||0)*f,soc:x.soc});}
+  const TK=[];if(P&&P.kwartieren){const q=9e5,vanaf=Math.floor(nu.getTime()/q)*q+q;
+    for(const k of P.kwartieren){const t0=new Date(k.start).getTime();if(t0<vanaf||t0>=eind.getTime())continue;
+      TK.push({t:t0+q/2,zon:(k.zon_kwh||0)*4,verb:((k.huis_kwh||0)+(k.wp_kwh||0)+(k.auto_kwh||0))*4,net:(k.net_kwh||0)*4,soc:k.soc_na,toek:true});}}
+  const zonToek=TK.reduce((a,p)=>a+p.zon/4,0);
+  const laad=som(x=>Math.max(x.accu_kwh||0,0)),leve=som(x=>Math.max(-(x.accu_kwh||0),0));
+  tg.innerHTML=[['var(--zon)',nf(zon,1),'kWh','zon opgewekt'],['var(--huis)',nf(verb,1),'kWh','verbruik van je huis'],
+    ['var(--net)',`${nf(af,1)} / ${nf(terug,1)}`,'kWh','van het net / teruggeleverd'],['var(--accu)',`${nf(laad,1)} / ${nf(leve,1)}`,'kWh','accu geladen / geleverd']]
+    .map(([c,w,e,l],i)=>`<div class="tegel"><b>${w}<small>${e}</small></b><span><i style="background:${c}"></i>${l}${i===0&&zonToek>0.1?`<br><em>nog ${nf(zonToek,1)} kWh verwacht</em>`:''}</span></div>`).join('');
+  if(P4.length<2){el.innerHTML='<p class="klein">Je dag verschijnt hier zodra het brein een paar kwartier heeft gemeten.</p>';return;}
+  const W=440,H=118,PL=2,PR=2,T=10,B=6,bodem=H-B;
+  const hoog=Math.max(...P4.concat(TK).map(p=>Math.max(p.zon,p.verb,0)),0.5),stap=[1,2,3,4,6,8,10,12,15,20,25,30].find(v=>v>=hoog*1.05)||Math.ceil(hoog);
+  const x=t=>PL+(t-mid)/span*(W-PL-PR),y=v=>T+(1-Math.min(v,stap)/stap)*(bodem-T),ys=v=>T+(1-v/100)*(bodem-T);
+  const lijn=k=>P4.map(p=>`${x(p.t).toFixed(1)},${y(p[k]).toFixed(1)}`).join(' ');
+  const zonvlak=`M${x(P4[0].t).toFixed(1)},${bodem} L${lijn('zon').split(' ').join(' L')} L${x(P4[P4.length-1].t).toFixed(1)},${bodem} Z`;
+  const soclijn=P4.filter(p=>p.soc!=null).map(p=>`${x(p.t).toFixed(1)},${ys(Math.max(0,Math.min(100,p.soc))).toFixed(1)}`).join(' ');
+  let ras='';for(let u=0;u<=24;u+=6){const xx=PL+u/24*(W-PL-PR);ras+=`<line x1="${xx}" x2="${xx}" y1="${T}" y2="${bodem}" stroke="var(--hair)"/><text x="${xx}" y="${H+10}" text-anchor="${u===0?'start':u===24?'end':'middle'}">${u===24?'24':u}:00</text>`;}
+  const laatste=P4[P4.length-1],ALLE=P4.concat(TK),lijnT=k=>[laatste,...TK].map(p=>`${x(p.t).toFixed(1)},${y(p[k]).toFixed(1)}`).join(' ');
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H+14}" aria-label="Zon en verbruik van vandaag in kW, met de lading van de accu">
+    <defs><linearGradient id="dg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--zon);stop-opacity:.4"/><stop offset="1" style="stop-color:var(--zon);stop-opacity:.04"/></linearGradient></defs>
+    ${ras}<line x1="${PL}" x2="${W-PR}" y1="${y(stap/2)}" y2="${y(stap/2)}" stroke="var(--hair)" stroke-dasharray="2 4"/>
+    <text x="${PL+2}" y="${T-2}" style="font-size:10.5px">${stap} kW</text>
+    <path d="${zonvlak}" fill="url(#dg)"/><polyline points="${lijn('zon')}" fill="none" stroke="var(--zon)" stroke-width="1.6" stroke-linejoin="round"/>
+    ${soclijn?`<polyline points="${soclijn}" fill="none" stroke="var(--accu)" stroke-width="1.4" stroke-dasharray="3 3" stroke-linejoin="round" opacity=".9"/>`:''}
+    ${TK.length?`<polyline points="${lijnT('zon')}" fill="none" stroke="var(--zon)" stroke-width="1.5" stroke-dasharray="2 3.5" stroke-linecap="round" opacity=".85"/><polyline points="${lijnT('verb')}" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-dasharray="2 3.5" stroke-linecap="round" opacity=".5"/>`:''}
+    <polyline points="${lijn('verb')}" fill="none" stroke="var(--ink)" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+    <line id="dag-cur" y1="${T}" y2="${bodem}" stroke="var(--muted)" stroke-width="1" style="display:none"/>
+    <circle cx="${x(laatste.t).toFixed(1)}" cy="${y(laatste.verb).toFixed(1)}" r="3.6" fill="var(--ink)" stroke="var(--bg)" stroke-width="1.8"/></svg>
+    <p class="dag-uit" id="dag-uit"></p>
+    <div class="sv"><span><i style="background:var(--zon)"></i>zon</span><span><i class="lijn"></i>verbruik</span><span><i class="stip2"></i>lading accu</span>${TK.length?'<span>stippellijn rechts van nu = verwachting</span>':''}</div>`;
+  const uit=$('dag-uit'),cur=$('dag-cur'),svg=el.querySelector('svg');
+  const toon=(p,nu_)=>{uit.innerHTML=`<b>${nu_?'Nu':tijd(new Date(p.t))}</b>${p.toek?' verwacht':''} · zon ${nf2(p.zon)} kW · verbruik ${nf2(p.verb)} kW · ${p.net>=0.05?`van het net ${nf2(p.net)} kW`:p.net<=-0.05?`terug ${nf2(-p.net)} kW`:'geen netuitwisseling'}${p.soc!=null?` · accu ${nf(p.soc,0)}%`:''}`;};
+  toon(laatste,true);
+  const zoek=e=>{const r=svg.getBoundingClientRect(),t=mid.getTime()+((e.clientX-r.left)/r.width*W-PL)/(W-PL-PR)*span;
+    let b=ALLE[0];for(const p of ALLE)if(Math.abs(p.t-t)<Math.abs(b.t-t))b=p;cur.setAttribute('x1',x(b.t));cur.setAttribute('x2',x(b.t));cur.style.display='';toon(b,b===laatste);};
+  svg.onpointermove=svg.onpointerdown=zoek;svg.onpointerleave=()=>{cur.style.display='none';toon(laatste,true);};
+}
 function prijsNiveau(nu){const K=((P&&P.kwartieren)||[]).slice(0,96).map(k=>k.inkoop);if(K.length<8)return '';
   const s=[...K].sort((a,b)=>a-b),lo=s[Math.floor(s.length*.33)],hi=s[Math.floor(s.length*.67)];
   const [c,t]=nu<=lo?['goedkoop','Goedkoop']:nu>=hi?['duur','Duur']:['','Gemiddeld'];
@@ -1442,7 +1511,7 @@ async function laadKosten(){try{const k=await api('/api/kosten?periode='+KP),t=k
 }catch(e){$('kosten-kop').innerHTML=`<p class="note">${esc(e.message)}</p>`;}}
 document.querySelectorAll('#kosten-periode button').forEach(b=>b.onclick=()=>{KP=b.dataset.p;document.querySelectorAll('#kosten-periode button').forEach(x=>x.setAttribute('aria-pressed',x===b));laadKosten();});
 async function laadStatus(){try{S=await api('/api/status');renderStatus();$('err').hidden=true;}catch(e){$('err').textContent='Geen verbinding met het brein. Draait het programma nog? ('+e.message+')';$('err').hidden=false;}}
-async function laadPlan(){try{P=await api('/api/plan');if(S&&S.besluit&&S.besluit.inkoop!=null&&$('prijs'))$('prijs').innerHTML=`<span class="groot">${eur(S.besluit.inkoop)}</span>${prijsTrend(S.besluit.inkoop)}`;if(!$('v-plan').hidden)renderPlan();renderSpark();if(S)renderStraks();}catch(e){}}
+async function laadPlan(){try{P=await api('/api/plan');if(S&&S.besluit&&S.besluit.inkoop!=null&&$('prijs'))$('prijs').innerHTML=`<span class="groot">${eur(S.besluit.inkoop)}</span>${prijsTrend(S.besluit.inkoop)}`;if(!$('v-plan').hidden)renderPlan();renderSpark();renderDag();if(S)renderStraks();}catch(e){}}
 
 document.querySelectorAll('.keuze[data-a]').forEach(g=>g.addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b||b.disabled)return;
@@ -1797,7 +1866,7 @@ $('tibbertest').onclick=async()=>{const r=$('r-tibber');r.className='res';r.text
 
 window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.includes(v))view(v);});
 view((location.hash||'#thuis').slice(1));
-laadStatus().then(laadPlan).then(laadOpbrengst);
+laadStatus().then(laadPlan).then(laadOpbrengst).then(laadDag);setInterval(laadDag,60000);
 /* ---------- grafieken: gemeten ---------- */
 const REEKS=[{k:'zon',n:'Zonnepanelen',c:'var(--zon)'},{k:'huis',n:'Huis',c:'var(--ink)'},{k:'accu',n:'Thuisaccu (+ laden, − leveren)',c:'var(--accu)'},
   {k:'net',n:'Net (+ afname, − teruglevering)',c:'var(--net)'},{k:'auto',n:'Auto laden',c:'var(--auto)'},{k:'wp',n:'Warmtepomp',c:'var(--wp)'}];
