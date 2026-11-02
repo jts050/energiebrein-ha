@@ -36,7 +36,7 @@ INSTELBAAR = {
     "zonnepanelen": None,
     "accu": ["capaciteit_kwh", "max_laden_kw", "max_ontladen_kw", "min_soc", "max_soc", "min_winst_per_kwh", "terugverkopen", "zon_altijd_in_accu", "stormstand", "onzekerheidsreserve", "slijtage_per_kwh"],
     "laadpaal": ["type", "host", "fasen", "max_stroom_a", "auto_accu_kwh", "gebruiker", "wachtwoord", "serienummer"],
-    "warmtepomp": ["type", "relais1", "relais2", "meter", "vermogen_kw", "jaarverbruik_kwh", "blokkeer_uren_per_dag", "max_wacht_achter_elkaar_uur", "niet_wachten_onder_c", "comfort_tijden"],
+    "warmtepomp": ["type", "relais1", "relais2", "meter", "thermostaat", "verhoging", "verlaging", "vermogen_kw", "jaarverbruik_kwh", "blokkeer_uren_per_dag", "max_wacht_achter_elkaar_uur", "niet_wachten_onder_c", "comfort_tijden"],
     "huis": ["jaarverbruik_kwh"],
     "auto": ["merk", "gebruiker", "wachtwoord", "spin", "vin"],
     "meldingen": ["telefoon", "bij_opgelost"],

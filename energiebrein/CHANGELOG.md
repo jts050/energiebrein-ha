@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.20.0
+
+- **Warmtepomp sturen via de thermostaat in Home Assistant (bijvoorbeeld ATAG).** Bij Koppelen → Warmtepomp is er een derde keuze: "Sturen via de thermostaat in Home Assistant". Het brein zet de gewenste kamertemperatuur dan iets hoger op goedkope momenten en bij zonne-overschot, iets lager als stroom duur is, en daarna terug naar jouw eigen waarde (standaard 1 °C, instelbaar). Zet je zelf de temperatuur anders terwijl het brein hem verschoven heeft, dan blijft jouw keuze staan, en na een herstart wordt een verschuiving netjes ongedaan gemaakt. De temperatuur blijft altijd tussen 15 en 25 °C. Voeg bij ATAG eerst de ATAG-koppeling toe in Home Assistant en vul de naam van de thermostaat in (bijvoorbeeld `climate.atag_one`). Werkt alleen als Energiebrein als add-on in Home Assistant draait. Een eigen meter (Shelly of HomeWizard) kun je erbij zetten voor het echte verbruik; alles wat er al was blijft werken zoals het was.
+
 ## 1.19.0
 
 - **Tijdelijk zelf kiezen, daarna weer Slim.** Bij Bediening kies je 30 minuten, 1, 2, 4 of 24 uur voor handmatige standen. Per apparaat staat de eindtijd erbij. Na afloop keert het apparaat terug naar Slim; de eindtijd overleeft een herstart. Slim kiezen annuleert de timer meteen. Ook nieuwe laadkeuzes via de telefoonmelding gelden standaard twee uur. Bestaande opgeslagen standen zonder timer blijven geldig: kies opnieuw een stand om een eindtijd in te stellen.

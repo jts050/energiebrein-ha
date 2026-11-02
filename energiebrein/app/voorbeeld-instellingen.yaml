@@ -83,10 +83,13 @@ laadpaal:
 
 # ---------- Warmtepomp (SG-ready via twee Shelly-relais) ----------
 warmtepomp:
-  type: uit               # sgready_shelly of uit
+  type: uit               # sgready_shelly, meter, ha_thermostaat of uit
   relais1: 192.168.1.70   # SG-ready contact 1
   relais2: 192.168.1.71   # SG-ready contact 2
   meter: ""              # IP van een Shelly-energiemeter op de groep van de warmtepomp (leeg = schatten)
+  thermostaat: ""        # bij type ha_thermostaat: de thermostaat in Home Assistant, bijvoorbeeld climate.atag_one
+  verhoging: 1.0          # °C hoger op goedkope momenten (alleen bij ha_thermostaat)
+  verlaging: 1.0          # °C lager op dure momenten (alleen bij ha_thermostaat)
   vermogen_kw: 2.0
   boost_uren_per_dag: 3   # hoeveel uur hij extra mag stoken op goedkope momenten
   blokkeer_uren_per_dag: 2  # hoeveel uur hij mag wachten op dure momenten

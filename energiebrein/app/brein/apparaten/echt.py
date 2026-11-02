@@ -4,8 +4,10 @@ Elke driver stuurt een opdracht alleen als die echt verandert: omvormers schrijv
 naar intern geheugen, en dat moet je niet elke 10 seconden doen."""
 from __future__ import annotations
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import aiohttp
 
@@ -526,6 +528,109 @@ class SGReadyShelly:
             kw = await shelly_vermogen_kw(meter)
             return {"wp_kw": kw, "wp_stand": self.stand}
         # Zonder eigen meter schatten we het vermogen uit de stand
+        p = self.cfg["vermogen_kw"]
+        return {"wp_kw": {"boost": p, "wacht": 0.0}.get(self.stand, p * 0.35), "wp_stand": self.stand}
+
+
+class HAThermostaat:
+    """Warmtepomp sturen via de thermostaat in Home Assistant (bijvoorbeeld ATAG One / Zone met de ATAG-koppeling).
+    Het brein verandert niet de warmtepomp zelf maar de gewenste kamertemperatuur: "boost" zet die iets hoger, "wacht" iets lager,
+    "normaal" zet hem terug naar wat jij had ingesteld. Alleen beschikbaar als Energiebrein als add-on in Home Assistant draait.
+    Zet je zelf de temperatuur anders terwijl het brein hem verschoven heeft, dan blijft jouw keuze staan."""
+    MIN_C, MAX_C = 15.0, 25.0                      # nooit buiten deze grenzen, wat je ook instelt
+
+    def __init__(self, cfg: dict, bewaar: Path | None = None):
+        self.cfg = cfg["warmtepomp"]
+        self.stand = "normaal"
+        self._laatste = None
+        self.basis: float | None = None             # jouw eigen ingestelde temperatuur, zolang het brein hem verschoven heeft
+        self.gezet: float | None = None             # wat het brein er zelf van gemaakt heeft
+        self._pad = bewaar
+        try:
+            if bewaar and bewaar.exists():
+                d = json.loads(bewaar.read_text(encoding="utf-8"))
+                self.basis, self.gezet = d.get("basis"), d.get("gezet")
+        except Exception:
+            pass
+
+    def _bewaar(self):
+        if self._pad:
+            try:
+                self._pad.write_text(json.dumps({"basis": self.basis, "gezet": self.gezet}), encoding="utf-8")
+            except Exception as e:
+                log.warning("Thermostaatstand bewaren mislukt: %s", e)
+
+    @property
+    def _entiteit(self) -> str:
+        e = (self.cfg.get("thermostaat") or "").strip()
+        if not e.startswith("climate."):
+            raise RuntimeError("vul de thermostaat uit Home Assistant in, bijvoorbeeld climate.atag_one")
+        return e
+
+    async def _toestand(self) -> dict:
+        from .. import telefoon
+        entiteit = self._entiteit
+        if not telefoon.beschikbaar():
+            raise RuntimeError("sturen via de thermostaat werkt alleen als Energiebrein in Home Assistant draait")
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
+            async with s.get(f"{telefoon.HA}/states/{entiteit}", headers=telefoon._kop()) as r:
+                if r.status == 404:
+                    raise RuntimeError(f"Home Assistant kent {self._entiteit} niet")
+                r.raise_for_status()
+                return await r.json(content_type=None)
+
+    async def _zet(self, graden: float, t: dict) -> float:
+        from .. import telefoon
+        a = t.get("attributes") or {}
+        stap = float(a.get("target_temp_step") or 0.5)
+        lo = max(self.MIN_C, float(a.get("min_temp") or self.MIN_C))
+        hi = min(self.MAX_C, float(a.get("max_temp") or self.MAX_C))
+        graden = round(max(lo, min(hi, graden)) / stap) * stap
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
+            async with s.post(f"{telefoon.HA}/services/climate/set_temperature", headers=telefoon._kop(),
+                              json={"entity_id": self._entiteit, "temperature": graden}) as r:
+                r.raise_for_status()
+        return graden
+
+    async def start(self):
+        await self.warmtepomp("normaal")
+
+    async def stop(self):
+        try:
+            self._laatste = None
+            await self.warmtepomp("normaal")
+        except Exception as e:
+            log.warning("Thermostaat terugzetten mislukt: %s", e)
+
+    async def warmtepomp(self, stand: str):
+        if stand == self._laatste:
+            return
+        t = await self._toestand()
+        huidig = (t.get("attributes") or {}).get("temperature")
+        huidig = float(huidig) if huidig is not None else None
+        if stand == "normaal":
+            if self.basis is not None:
+                if huidig is not None and self.gezet is not None and abs(huidig - self.gezet) < 0.01:
+                    await self._zet(self.basis, t)          # nog zoals het brein hem zette: terug naar jouw waarde
+                self.basis = self.gezet = None             # anders heb je zelf iets anders gekozen: dat blijft
+                self._bewaar()
+        else:
+            if self.basis is None:
+                if huidig is None:
+                    raise RuntimeError("de thermostaat meldt geen gewenste temperatuur")
+                self.basis = huidig
+            elif huidig is not None and self.gezet is not None and abs(huidig - self.gezet) >= 0.01:
+                self.basis = huidig                         # je veranderde de temperatuur zelf: reken vanaf jouw nieuwe waarde
+            delta = {"boost": float(self.cfg.get("verhoging", 1.0)), "wacht": -float(self.cfg.get("verlaging", 1.0))}.get(stand, 0.0)
+            self.gezet = await self._zet(self.basis + delta, t)
+            self._bewaar()
+        self._laatste = self.stand = stand
+        log.info("Warmtepomp via thermostaat: %s", stand)
+
+    async def lees(self) -> dict:
+        meter = (self.cfg.get("meter") or "").strip()
+        if meter:
+            return {"wp_kw": await shelly_vermogen_kw(meter), "wp_stand": self.stand}
         p = self.cfg["vermogen_kw"]
         return {"wp_kw": {"boost": p, "wacht": 0.0}.get(self.stand, p * 0.35), "wp_stand": self.stand}
 

@@ -101,6 +101,9 @@ class Huis:
             self.wp = echt.SGReadyShelly(cfg)
         elif cfg["warmtepomp"].get("type") == "meter":
             self.wp = echt.WPMeter(cfg)
+        elif cfg["warmtepomp"].get("type") == "ha_thermostaat":
+            from ..config import data_map
+            self.wp = echt.HAThermostaat(cfg, data_map(cfg) / "wp_thermostaat.json")
 
     def onderdelen(self) -> dict:
         if self.sim:
@@ -111,7 +114,7 @@ class Huis:
                  "DeyeSolarman": "Deye (Solarman)", "Solis": "Solis", "SolisCloud": "Solis (SolisCloud)", "ESPHomeP1": "ESPHome P1-lezer", "TibberPulse": "Tibber Pulse",
                  "TeslaWallConnector": "Tesla Wall Connector", "Easee": "Easee (via account)", "HomeWizardP1": "HomeWizard P1",
                  "Youless": "Youless", "P1Monitor": "P1 Monitor", "ShellyEM": "Shelly EM", "OCPPLaadpaal": "OCPP 1.6",
-                 "GoE": "go-e Charger", "SGReadyShelly": "SG-ready"}
+                 "GoE": "go-e Charger", "SGReadyShelly": "SG-ready", "HAThermostaat": "Thermostaat via Home Assistant"}
         n = lambda x: namen.get(type(x).__name__, type(x).__name__) if x else None
         return {"omvormer": n(self.omvormer), "p1": n(self.p1), "laadpaal": n(self.laadpaal), "warmtepomp": n(self.wp)}
 
