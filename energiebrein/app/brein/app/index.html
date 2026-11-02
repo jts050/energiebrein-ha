@@ -749,6 +749,9 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
     <!-- ============ BEDIENING ============ -->
     <section id="v-bediening" data-v hidden>
       <div class="kop1"><div><h1>Bediening</h1><p>Op Slim beslist het brein. Kies iets anders om zelf in te grijpen.</p></div></div>
+      <label class="f">Handmatige standen gelden voor
+        <select id="bed-duur"><option value="30">30 minuten</option><option value="60">1 uur</option><option value="120" selected>2 uur</option><option value="240">4 uur</option><option value="1440">24 uur</option></select>
+      </label><p class="klein">Daarna gaat het apparaat automatisch terug naar Slim, ook na een herstart. Slim kiezen stopt de tijdelijke stand meteen.</p>
       <div class="apparaten">
         <div class="app-kaart" style="--k:var(--accu)">
           <div class="app-kop"><div class="ico" style="background:color-mix(in srgb,var(--accu) 16%,transparent);color:var(--accu)"><svg><use href="#i-accu"/></svg></div><div><b>Thuisaccu</b><span id="s-accu"></span></div></div>
@@ -847,6 +850,9 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         <h3 class="tussen" style="margin-top:14px">Slim handelen</h3>
         <label class="chk"><input type="checkbox" id="k-zon-accu"> Zonne-overschot altijd eerst in de accu (zolang die ruimte heeft)</label>
         <label class="chk"><input type="checkbox" id="k-verkopen"> De accu mag stroom aan het net verkopen</label>
+        <label class="chk"><input type="checkbox" id="k-reserve"> Extra accureserve bij onzekerheid over zon en huisverbruik</label>
+        <p class="note">Bewaart boven de ondergrens maximaal 10 procentpunt extra voor de komende vier uur. De reserve kan geld kosten en is geen noodstroomgarantie.</p>
+        <label class="f">Geschatte accuslijtage per geladen kWh (€)<input id="k-slijtage" type="number" min="0" max="1" step="0.01"></label>
         <label class="chk"><input type="checkbox" id="k-storm"> Accu vol houden bij onweer of zware storm (voor als de stroom uitvalt)</label>
         <p class="note">Alleen zinvol als er een noodstroomgroep (backup) op de omvormer zit. Het brein laadt de accu dan een paar uur van tevoren vol, ook als dat wat kost.</p>
         <div class="f3"><label class="f">Minimale winst per kWh (€)<input id="k-accu-winst" type="number" step="0.01" min="0" max="1" placeholder="0,03"></label></div>
@@ -1262,7 +1268,17 @@ function renderStatus(){
   $('rijen').querySelectorAll('[data-naar]').forEach(li=>li.onclick=()=>view(li.dataset.naar));
   renderAI(v);
   // bediening
+  const reserve=S.plan_samenvatting&&S.plan_samenvatting.reserve;
+  let rp=$('reserve-uitleg');
+  if(!rp){rp=document.createElement('p');rp.id='reserve-uitleg';rp.className='note';$('accu-handel').after(rp);}
+  rp.textContent=reserve&&reserve.actief?`Onzekerheidsreserve: bewaren tot ${nf(reserve.ondergrens_pct,0)}% (${nf(reserve.extra_pct,1)} procentpunt extra). ${reserve.reden}`:'';
   const bed=S.bediening;
+  document.querySelectorAll('.keuze[data-a]').forEach(g=>{
+    let p=g.parentElement.querySelector('.bed-eind');
+    if(!p){p=document.createElement('p');p.className='klein bed-eind';g.after(p);}
+    const eind=bed.tot&&bed.tot[g.dataset.a];
+    p.textContent=eind?`Tijdelijk tot ${new Date(eind).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}, daarna Slim.`:'';
+  });
   document.querySelectorAll('.keuze[data-a]').forEach(g=>g.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',bed[g.dataset.a]===x.dataset.s)));
   document.querySelectorAll('[data-a=laadpaal] button').forEach(x=>x.disabled=!a.laadpaal);
   document.querySelectorAll('[data-a=warmtepomp] button').forEach(x=>x.disabled=!a.warmtepomp);
@@ -1500,15 +1516,18 @@ async function laadKosten(){try{const k=await api('/api/kosten?periode='+KP),t=k
   else{lijst=k.dagen.map(d=>({...d,titel:new Date(d.dag+'T12:00').toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'})}));
     as=[new Date(k.dagen[0].dag+'T12:00').toLocaleDateString('nl-NL',{day:'numeric',month:'short'}),KP==='maand'?'vandaag':new Date(k.dagen[k.dagen.length-1].dag+'T12:00').toLocaleDateString('nl-NL',{day:'numeric',month:'short'})];}
   const beste=lijst.reduce((a,d)=>d.besparing>(a?a.besparing:-1e9)?d:a,null);
-  $('kosten-kop').innerHTML=`<div class="groot">${eur(t.besparing)}</div><span class="klein">bespaard ${naam}, vergeleken met alle stroom van het net halen</span>
+  $('kosten-kop').innerHTML=`<div class="groot">${eur(t.besparing)}</div><span class="klein">berekend bruto voordeel ${naam}, tegenover alle stroom van het net halen</span>
     ${staafjes(lijst,'besparing',KP==='jaar'?'Besparing per maand':'Besparing per dag')}<div class="as"><span>${as[0]}</span><span>${as[1]}</span></div>
     <p class="kosten-dag" id="kosten-dag">Tik op een staafje om te zien waar het bedrag uit bestaat.</p>
     <ul class="regels"><li><span>Stroomkosten</span><b>${eur(t.kosten)}</b></li>
     <li><span>Zonder zon en accu had het gekost</span><b>${eur(t.zonder_alles)}</b></li>
-    <li><span>Waarvan bespaard door de accu en het brein</span><b>${eur(t.door_accu)}</b></li>
+    <li><span>Kasverschil door accu (zelfde verbruik en tarieven)</span><b>${eur(t.door_accu_kas)}</b></li>
+    <li><span>Geschatte verandering waarde accuvoorraad</span><b>${eur(t.lading_eur)}</b></li>
+    <li><span>Geschatte slijtage (per geladen kWh)</span><b>${t.slijtage_volledig?eur(t.slijtage_eur):'Onvolledige historie'}</b></li>
+    <li><span>Netto berekend voordeel accu</span><b>${t.door_accu_netto==null?'Nog onbekend':eur(t.door_accu_netto)}</b></li>
     <li><span>Terugleveren leverde op</span><b>${eur(t.teruglevering)}</b></li>
     ${beste&&lijst.length>2?`<li><span>Beste ${KP==='jaar'?'maand':'dag'}</span><b>${beste.titel}: ${eur(beste.besparing)}</b></li>`:''}
-    ${KP==='maand'&&OPB&&OPB.volle_dagen>=3?`<li><span>Verwacht per jaar</span><b>± ${eur(OPB.per_jaar).replace(',00','')}</b></li>`:''}</ul>`;
+    </ul>`;
   $('kosten-lijst-kop').textContent=KP==='jaar'?'Per maand':'Per dag';
   $('kosten-lijst').innerHTML=`<tr><th>${KP==='jaar'?'Maand':'Dag'}</th><th>Betaald</th><th>Zonder zon en accu</th><th>Bespaard</th>${KP!=='jaar'?'<th>Accu</th>':''}</tr>`
     +[...lijst].reverse().map(d=>`<tr><td>${esc(d.titel)}</td><td>${eur(d.kosten)}</td><td>${eur(d.zonder_alles)}</td><td class="${d.besparing<0?'min':'plus'}">${eur(d.besparing)}</td>`
@@ -1525,7 +1544,7 @@ async function laadKosten(){try{const k=await api('/api/kosten?periode='+KP),t=k
     c(nf(t.verbruik_kwh,0)+' kWh','Verbruik in totaal')+c(nf(t.afname_kwh,0)+' / '+nf(t.terug_kwh,0)+' kWh','Van het net / teruggeleverd')+
     (t.auto_kwh>0.5?c(nf(t.auto_kwh,0)+' kWh','In de auto geladen'):'')+(t.wp_kwh>0.5?c(nf(t.wp_kwh,0)+' kWh','Warmtepomp'):'')+
     (t.afname_kwh>0?c(eur(t.kosten/Math.max(t.afname_kwh,1)),'Gemiddeld per kWh van het net'):'');
-  $('kosten-uitleg').textContent='Bespaard is wat alle stroom van het net had gekost, min wat je echt betaalde. Stroom die nog in de accu zit, telt mee tegen de prijs van die dag.';
+  $('kosten-uitleg').textContent=`De vergelijking gebruikt hetzelfde gemeten verbruik en de toen geldende tarieven. Kasverschil door accu: ${eur(t.door_accu_kas||0)}. Geschatte verandering van accuvoorraad: ${eur(t.lading_eur||0)}. ${t.door_accu_netto==null?'Netto voordeel nog onbekend: slijtagemetingen ontbreken voor een deel van deze periode.':`Na ${eur(t.slijtage_eur)} geschatte slijtage blijft ${eur(t.door_accu_netto)} modelmatig accu-voordeel over.`} ${t.prijs_geschat?'Voor een deel zijn tarieven geschat.':''} Dit is een berekende vergelijking, geen gemeten factuurkorting. Laadverliezen zitten in de gemeten netkosten; voorraad wordt geschat uit SOC en rendement.`;
 }catch(e){$('kosten-kop').innerHTML=`<p class="note">${esc(e.message)}</p>`;}}
 document.querySelectorAll('#kosten-periode button').forEach(b=>b.onclick=()=>{KP=b.dataset.p;document.querySelectorAll('#kosten-periode button').forEach(x=>x.setAttribute('aria-pressed',x===b));laadKosten();});
 async function laadStatus(){try{S=await api('/api/status');renderStatus();$('err').hidden=true;}catch(e){$('err').textContent='Geen verbinding met het brein. Draait het programma nog? ('+e.message+')';$('err').hidden=false;}}
@@ -1533,7 +1552,7 @@ async function laadPlan(){try{P=await api('/api/plan');if(S&&S.besluit&&S.beslui
 
 document.querySelectorAll('.keuze[data-a]').forEach(g=>g.addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b||b.disabled)return;
-  try{S=await api('/api/bediening',{apparaat:g.dataset.a,stand:b.dataset.s});renderStatus();laadPlan();}catch(err){$('err').textContent=err.message;$('err').hidden=false;}}));
+  try{S=await api('/api/bediening',{apparaat:g.dataset.a,stand:b.dataset.s,minuten:Number($("bed-duur").value)});renderStatus();laadPlan();}catch(err){$('err').textContent=err.message;$('err').hidden=false;}}));
 /* ---------- auto slim laden ---------- */
 const DAGNAAM={ma:'Ma',di:'Di',wo:'Wo',do:'Do',vr:'Vr',za:'Za',zo:'Zo'},DAGLANG={ma:'ma',di:'di',wo:'wo',do:'do',vr:'vr',za:'za',zo:'zo'};
 let APSOORT=null,APOPEN=false;
@@ -1692,7 +1711,7 @@ async function laadInstellingen(){
   $('k-lev').value=LEV.leveranciers[c.prijzen.leverancier]?c.prijzen.leverancier:'anders';levInfo();
   const zet=(id,v)=>{$(id).value=v??'';};
   zet('k-omv-type',c.omvormer.type||'uit');$('k-omkeer').checked=!!c.omvormer.accu_omkeren;zet('k-omv-host',c.omvormer.host);zet('k-mb-poort',c.omvormer.modbus_poort||502);zet('k-mb-unit',c.omvormer.modbus_unit??1);zet('k-gebr',c.omvormer.gebruiker);zet('k-ww',c.omvormer.wachtwoord);zet('k-serie',c.omvormer.serienummer);$('k-sturen').checked=!!c.omvormer.sturen;$('k-huismeter').checked=c.omvormer.meter_meet==='huis';$('k-p1regel').checked=c.omvormer.regel==='p1';zet('k-sleutel',(c.net.p1||{}).sleutel);zet('k-lp-host',c.laadpaal.host);zet('k-tibber',c.prijzen.tibber_token);zet('k-sc-sleutel',(c.zonvoorspelling||{}).solcast_sleutel);zet('k-sc-sites',(c.zonvoorspelling||{}).solcast_sites);$('k-aftop').checked=!!c.omvormer.aftoppen_bij_negatieve_prijs;
-  $('k-verkopen').checked=c.accu.terugverkopen!==false;$('k-zon-accu').checked=c.accu.zon_altijd_in_accu!==false;$('k-storm').checked=!!c.accu.stormstand;zet('k-accu-winst',c.accu.min_winst_per_kwh??0.03);
+  $('k-verkopen').checked=c.accu.terugverkopen!==false;$('k-zon-accu').checked=c.accu.zon_altijd_in_accu!==false;$('k-storm').checked=!!c.accu.stormstand;zet('k-accu-winst',c.accu.min_winst_per_kwh??0.03);$('k-reserve').checked=!!c.accu.onzekerheidsreserve;zet('k-slijtage',c.accu.slijtage_per_kwh??0.02);
   if(c.omvormer.regel==='p1'||c.omvormer.meter_meet==='huis')document.querySelector('.extra.meet').open=true;
   zet('k-accu-cap',c.accu.capaciteit_kwh);const okw=+c.omvormer.vermogen_kw||Math.max(c.accu.max_laden_kw,c.accu.max_ontladen_kw,1);zet('k-omv-kw',okw);zet('k-accu-in',Math.round(c.accu.max_laden_kw/okw*100));zet('k-accu-uit',Math.round(c.accu.max_ontladen_kw/okw*100));zet('k-accu-min',c.accu.min_soc);zet('k-accu-max',c.accu.max_soc??100);accuKw();
   zet('k-p1-type',(c.net.p1||{}).type||'uit');zet('k-p1-host',(c.net.p1||{}).host);zet('k-maxkw',c.net.max_afname_kw);
@@ -1796,7 +1815,7 @@ $('kform').addEventListener('submit',async e=>{e.preventDefault();
     omvormer:{vermogen_kw:n('k-omv-kw'),type:$('k-omv-type').value,host:$('k-omv-host').value.trim(),modbus_poort:parseInt($('k-mb-poort').value)||502,modbus_unit:parseInt($('k-mb-unit').value)||1,sturen:$('k-sturen').checked,accu_omkeren:$('k-omkeer').checked,gebruiker:$('k-gebr').value.trim(),wachtwoord:$('k-ww').value,serienummer:$('k-serie').value.trim(),aftoppen_bij_negatieve_prijs:$('k-aftop').checked,meter_meet:$('k-huismeter').checked?'huis':'net',regel:$('k-p1regel').checked?'p1':'omvormer'},
     zonnepanelen:[...document.querySelectorAll('.vlak')].map(d=>({kwp:parseFloat(d.querySelector('.v-kwp').value)||0,hoek:parseFloat(d.querySelector('.v-hoek').value)||0,richting:parseFloat(d.querySelector('.v-richting').value)})),
     accu:{capaciteit_kwh:n('k-accu-cap'),max_laden_kw:Math.round(n('k-omv-kw')*(n('k-accu-in')||100))/100,max_ontladen_kw:Math.round(n('k-omv-kw')*(n('k-accu-uit')||100))/100,min_soc:n('k-accu-min'),max_soc:n('k-accu-max')||100,
-      min_winst_per_kwh:Number.isFinite(n('k-accu-winst'))?n('k-accu-winst'):0.03,terugverkopen:$('k-verkopen').checked,zon_altijd_in_accu:$('k-zon-accu').checked,stormstand:$('k-storm').checked},
+      min_winst_per_kwh:Number.isFinite(n('k-accu-winst'))?n('k-accu-winst'):0.03,terugverkopen:$('k-verkopen').checked,zon_altijd_in_accu:$('k-zon-accu').checked,stormstand:$('k-storm').checked,onzekerheidsreserve:$('k-reserve').checked,slijtage_per_kwh:n('k-slijtage')},
     laadpaal:{type:$('k-lp-type').value,host:$('k-lp-host').value.trim(),gebruiker:$('k-lp-gebr').value.trim(),wachtwoord:$('k-lp-ww').value,serienummer:$('k-lp-serie').value.trim(),fasen:parseInt($('k-lp-fasen').value),max_stroom_a:n('k-lp-a'),auto_accu_kwh:n('k-lp-auto')},
     warmtepomp:{type:$('k-wp-type').value,relais1:$('k-wp-r1').value.trim(),relais2:$('k-wp-r2').value.trim(),meter:$('k-wp-meter').value.trim(),vermogen_kw:n('k-wp-kw'),jaarverbruik_kwh:n('k-wp-jaar'),comfort_tijden:$('k-wp-comfort').value.split(/[,;]/).map(x=>x.trim().replace(/\s+/g,'').replace(/–/g,'-')).filter(x=>/^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(x)),blokkeer_uren_per_dag:n('k-wp-blok'),max_wacht_achter_elkaar_uur:n('k-wp-run'),niet_wachten_onder_c:n('k-wp-min')},
     huis:{jaarverbruik_kwh:n('k-huis')},
