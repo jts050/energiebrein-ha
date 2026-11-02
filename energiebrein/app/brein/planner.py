@@ -62,6 +62,8 @@ class Planner:
         # met een lage, gemiddelde en hoge uitkomst en kiest wat gemiddeld het goedkoopst is, in plaats van op één gok te bouwen.
         self.onzekerheid: dict = {}
         self.rendement: float | None = None    # rendement heen en terug waarmee gerekend wordt; leeg = wat je instelde (zie Conditie)
+        self.reserve_pct = 0.0
+        self.reserve_info: dict = {}
         self._e_start = 0.0
         self._eindwaarde = 0.0
 
@@ -78,12 +80,32 @@ class Planner:
              wp_dag_kwh) -> dict:
         if not kw:
             return {"kwartieren": [], "samenvatting": {}}
+        self._reserve(kw)
         self._warmtepomp(kw, bed, wp_dag_kwh)
         self._auto(kw, bed, auto)
         self._accu(kw, soc_nu)
         return {"kwartieren": kw, "samenvatting": self._samenvatting(kw, soc_nu)}
 
     # ---------------------------------------------------------------
+    def _reserve(self, kw):
+        c = self.cfg["accu"]
+        basis = self.ondergrens_pct()
+        self.reserve_pct = basis
+        self.reserve_info = {"actief": False, "ondergrens_pct": basis, "extra_pct": 0.0}
+        if not c.get("onzekerheidsreserve", False) or not kw:
+            return
+        # Vier uur tegenvallende zon / extra huisvraag. Onvoldoende historie is geen zekerheid.
+        sz = max(float(.35 if self.onzekerheid.get("zon") is None else self.onzekerheid["zon"]), 0.0)
+        sh = max(float(.35 if self.onzekerheid.get("huis") is None else self.onzekerheid["huis"]), 0.0)
+        fout = sum(k.zon_kwh * sz + k.huis_kwh * sh for k in kw[:16])
+        cap = max(float(c["capaciteit_kwh"]), .1)
+        ruimte = max(0.0, float(c["max_soc"]) - basis - 2)
+        extra = min(10.0, ruimte, fout / self._eta() / cap * 100)
+        self.reserve_pct = basis + extra
+        self.reserve_info = {"actief": extra > .05, "ondergrens_pct": round(self.reserve_pct, 1),
+                             "extra_pct": round(extra, 1), "uren": 4,
+                             "reden": "Extra lading voor tegenvallende zon of hoger huisverbruik; maximaal 10 procentpunt."}
+
     def _scenarios(self, k: Kwartier, t: int) -> list[tuple[float, float]]:
         """(kans, afwijking in netverbruik in kWh) per uitkomst. Hoe verder vooruit, hoe onzekerder; het eerstvolgende uur is
         bijna zeker, na ongeveer 6 uur geldt de volle spreiding."""
@@ -309,6 +331,9 @@ class Planner:
                     kost = kost + w * np.where(gs > 0, gs * k.inkoop, gs * terug)
             doel = idx[:, None] + deltas[None, :]                              # (N+1, keuzes)
             geldig = (doel >= 0) & (doel <= N)
+            reserve = (cap * self.reserve_pct / 100 - lo) / stap
+            # Onder de reserve mag laden/rusten wel; ontladen niet. Geen fictieve startlading.
+            geldig &= ~((deltas < 0)[None, :] & (doel < reserve - 1e-9))
             if not verkopen:
                 # niet terugverkopen: ontladen mag alleen zolang het de vraag van het huis dekt, nooit naar het net
                 geldig &= ~((d < 0) & (g < min(netto, 0.0) - 1e-9))[None, :]
@@ -394,6 +419,7 @@ class Planner:
         voorraad = kw[-1].soc_na / 100 * self.cfg["accu"]["capaciteit_kwh"] - self._e_start
         return {"kosten_plan": round(met, 2), "kosten_zonder_accu": round(zonder, 2),
                 "besparing": round(zonder - met + voorraad * self._eindwaarde, 2), "voorraad_kwh": round(voorraad, 1),
+                "reserve": self.reserve_info,
                 "kwartieren": len(kw),
                 "tot": (kw[-1].start + timedelta(minutes=15)).isoformat(),
                 "goedkoopste": min(kw, key=lambda k: k.inkoop).start.isoformat(),

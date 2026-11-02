@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from .prijzen import model_prijs
 
 
-def opbrengst(rijen: list[dict], prijzen, dagen: int = 30, accu_kwh: float = 0.0, eta: float = 0.95) -> dict:
+def opbrengst(rijen: list[dict], prijzen, dagen: int = 30, accu_kwh: float = 0.0, eta: float = 0.95, slijtage_per_kwh: float = 0.02) -> dict:
     """accu_kwh en eta: grootte en ontlaadrendement van de accu. Stroom die op een dag in de accu is gegaan maar nog niet is
     gebruikt (of andersom), telt mee tegen de gemiddelde prijs van die dag. Anders lijkt een dag waarop 's nachts goedkoop
     is geladen voor de volgende ochtend een verliesdag, en de dag erna een topdag."""
@@ -35,7 +35,12 @@ def opbrengst(rijen: list[dict], prijzen, dagen: int = 30, accu_kwh: float = 0.0
         d = per_dag.get(dag)
         if d is None:
             d = per_dag[dag] = {"dag": dag, "kosten": 0.0, "zonder_accu": 0.0, "zonder_alles": 0.0, "teruglevering": 0.0,
-                                "zon_kwh": 0.0, "_prijs": 0.0, "_n": 0, "_soc0": vorige_soc, "_soc1": None}
+                                "zon_kwh": 0.0, "_prijs": 0.0, "_n": 0, "_soc0": vorige_soc, "_soc1": None, "slijtage_eur": 0.0, "slijtage_volledig": True, "prijs_geschat": False}
+        laden = r.get("accu_geladen_kwh")
+        d["slijtage_volledig"] = d["slijtage_volledig"] and laden is not None
+        if laden is not None:
+            d["slijtage_eur"] += max(laden, 0.0) * max(slijtage_per_kwh, 0.0)
+        d["prijs_geschat"] = d["prijs_geschat"] or r.get("inkoop") is None or r.get("terug") is None
         d["kosten"] += r.get("kosten") or 0
         d["zonder_accu"] += r.get("kosten_zonder") or 0
         d["zonder_alles"] += verbruik * inkoop
@@ -56,10 +61,12 @@ def opbrengst(rijen: list[dict], prijzen, dagen: int = 30, accu_kwh: float = 0.0
         d["soc_begin"], d["soc_eind"] = d["_soc0"], d["_soc1"]
         d["besparing"] = d["zonder_alles"] - d["kosten"] + lading
         d["door_accu"] = d["zonder_accu"] - d["kosten"] + lading
+        d["door_accu_kas"] = d["zonder_accu"] - d["kosten"]
+        d["door_accu_netto"] = (d["door_accu"] - d["slijtage_eur"]) if d["slijtage_volledig"] else None
         for k in [k for k in d if k.startswith("_")]:
             del d[k]
         for k in list(d):
-            if k != "dag" and d[k] is not None:
+            if k != "dag" and d[k] is not None and not isinstance(d[k], bool):
                 d[k] = round(d[k], 2)
     vandaag = datetime.now().astimezone().date()
     maand = [d for d in lijst if d["dag"][:7] == vandaag.isoformat()[:7]]
@@ -72,7 +79,7 @@ def opbrengst(rijen: list[dict], prijzen, dagen: int = 30, accu_kwh: float = 0.0
             "per_jaar": round(gem * 365), "volle_dagen": len(volle)}
 
 
-def kosten_periode(gesch, prijzen, periode: str, accu_kwh: float, eta: float) -> dict:
+def kosten_periode(gesch, prijzen, periode: str, accu_kwh: float, eta: float, slijtage_per_kwh: float = .02) -> dict:
     """Totalen en per dag (of per maand bij 'jaar') voor het kostenoverzicht."""
     from datetime import date, time, timedelta, timezone
     vandaag = datetime.now().astimezone().date()
@@ -86,10 +93,13 @@ def kosten_periode(gesch, prijzen, periode: str, accu_kwh: float, eta: float) ->
     van = datetime.combine(begin, time(0)).astimezone() - timedelta(days=1)
     tot = datetime.combine(eind, time(0)).astimezone()
     rijen = gesch.rijen(van, tot)
-    o = opbrengst(rijen, prijzen, 400, accu_kwh, eta)
+    o = opbrengst(rijen, prijzen, 400, accu_kwh, eta, slijtage_per_kwh)
     dagen = [d for d in o["dagen"] if begin.isoformat() <= d["dag"] < eind.isoformat()]
-    velden = ("kosten", "zonder_accu", "zonder_alles", "teruglevering", "zon_kwh", "besparing", "door_accu")
+    velden = ("kosten", "zonder_accu", "zonder_alles", "teruglevering", "zon_kwh", "besparing", "door_accu", "door_accu_kas", "slijtage_eur", "lading_eur")
     totaal = {k: round(sum(d[k] for d in dagen), 2) for k in velden}
+    totaal["slijtage_volledig"] = bool(dagen) and all(d["slijtage_volledig"] for d in dagen)
+    totaal["door_accu_netto"] = round(totaal["door_accu"] - totaal["slijtage_eur"], 2) if totaal["slijtage_volledig"] else None
+    totaal["prijs_geschat"] = any(d["prijs_geschat"] for d in dagen)
     # energie uit de metingen
     eigen = [r for r in rijen if (r.get("n") or 0) >= 3 and begin.isoformat() <= datetime.fromisoformat(r["start"]).astimezone().date().isoformat() < eind.isoformat()]
     som = lambda k: sum(r.get(k) or 0 for r in eigen)

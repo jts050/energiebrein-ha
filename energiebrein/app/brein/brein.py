@@ -53,10 +53,13 @@ class Brein:
         try:   # je keuzes in Bediening overleven een herstart
             import json as _j
             for k, v in _j.loads(self._bed_pad.read_text()).items():
-                if k in ("accu", "laadpaal", "warmtepomp", "zon"):
+                if k in ("accu", "laadpaal", "warmtepomp", "zon", "tot"):
                     setattr(self.bed, k, v)
         except Exception:
             pass
+        if not isinstance(self.bed.tot, dict):
+            self.bed.tot = {}
+        self.bed.verlopen()
         from .apparaten.autos import AutoAccount
         self.autoacc = AutoAccount(cfg, data_map(cfg))
         self._auto_pct_doel: float | None = None
@@ -122,6 +125,7 @@ class Brein:
 
     # ------------------------------------------------------------ plannen
     def maak_plan(self):
+        self._verloop_bediening()
         nu = datetime.now(timezone.utc)
         prijzen = self.prijzen.vanaf(nu)[: 4 * 48]
         self.voorsp.bereid([t for t, _ in prijzen])
@@ -241,12 +245,13 @@ class Brein:
 
     def ondergrens(self) -> float:
         """Tot hoever de accu echt leeg kan: de hoogste van de grens in Energiebrein en die in de omvormer."""
-        return max(float(self.cfg["accu"]["min_soc"]), self._omvormer_grens() or 0.0)
+        basis = max(float(self.cfg["accu"]["min_soc"]), self._omvormer_grens() or 0.0)
+        return max(basis, self.planner.reserve_pct) if self.bed.accu == "auto" else basis
 
     def bewaar_bediening(self):
         import json as _j
         try:
-            self._bed_pad.write_text(_j.dumps({k: getattr(self.bed, k) for k in ("accu", "laadpaal", "warmtepomp", "zon")}))
+            self._bed_pad.write_text(_j.dumps({k: getattr(self.bed, k) for k in ("accu", "laadpaal", "warmtepomp", "zon", "tot")}))
         except Exception as e:
             log.warning("Bediening opslaan mislukt: %s", e)
 
@@ -331,7 +336,7 @@ class Brein:
         stand = {"EB_LAAD_SLIM": "auto", "EB_LAAD_NU": "nu", "EB_LAAD_ZON": "zon"}.get(actie)
         if not stand:
             return
-        self.bed.laadpaal = stand
+        self.bed.kies("laadpaal", stand)
         self.bewaar_bediening()
         naam = {"auto": "slim laden", "nu": "direct laden", "zon": "alleen op zon"}[stand]
         self.logboek.schrijf("handmatig", f"Laadpaal via de melding op je telefoon op {naam} gezet", "laadpaal")
@@ -404,7 +409,16 @@ class Brein:
         else:
             await self.huis.accu("vasthouden", 0, m.accu_soc)
 
+    def _verloop_bediening(self):
+        verlopen = self.bed.verlopen()
+        if verlopen:
+            self.bewaar_bediening()
+            for apparaat in verlopen:
+                self.logboek.schrijf("systeem", "Tijdelijke stand afgelopen: weer Slim", apparaat)
+            self.herplan()
+
     async def regel(self):
+        self._verloop_bediening()
         m = await self.huis.lees()
         vorige_verbonden = self.meting.auto_verbonden if self.meting else False
         self.meting = m
@@ -451,7 +465,16 @@ class Brein:
                 await self.huis.accu(actie, kw, a["max_soc"] if actie == "laden" else m.accu_soc)
             b["accu"] = "Handmatig: " + {"laden": "laden", "ontladen": "leveren", "vasthouden": "vasthouden",
                                          "zelfverbruik": "eigen verbruik"}.get(actie, actie)
-            reden = "Je hebt dit zelf gekozen bij Bediening. Kies daar Slim om het brein weer te laten beslissen."
+            eind = self.bed.tot.get("accu")
+            reden = ("Tijdelijk zelf gekozen, daarna weer Slim." if eind else
+                     "Je hebt dit zelf gekozen bij Bediening. Kies daar Slim om het brein weer te laten beslissen.")
+        elif self.planner.reserve_info.get("actief") and leeg and not (k and k.accu_actie == "laden") \
+                and m.zon_kw <= m.huis_kw + m.wp_kw + m.auto_kw:
+            await self.huis.accu("vasthouden", 0, m.accu_soc)
+            b["accu"] = "Bewaart onzekerheidsreserve"
+            reden = f"Bewaart tot {grens:.0f}% voor tegenvallende zon of hoger huisverbruik."
+            if not self.huis.kan_vasthouden:
+                reden += " Deze omvormer kan de lading niet vasthouden; de reserve is alleen een plandoel."
         elif k and m.auto_kw > 1.0 and k.accu_actie != "laden" and m.zon_kw - m.huis_kw - m.wp_kw < m.auto_kw * 0.5 \
                 and not (k.accu_actie == "ontladen" and k.net_kwh < -0.02):
             # De auto laadt uit het net. De accu zou hem anders vanzelf meevoeden (de omvormer ziet alleen 'huis vraagt stroom').
@@ -940,6 +963,8 @@ class Brein:
         v["lading_kwh"] = round(verschil, 1)                       # zoveel meer (of minder) zit er nu in de accu dan vannacht
         v["lading_eur"] = round(verschil * self.waarde_lading(), 2)
         v["bespaard_accu"] = round(v["kosten_zonder_accu"] - v["kosten"] + v["lading_eur"], 2)
+        v["bespaard_accu_kas"] = round(v["kosten_zonder_accu"] - v["kosten"], 2)
+        v["slijtage_eur"] = round(v.get("accu_geladen_kwh", 0) * max(float(self.cfg["accu"].get("slijtage_per_kwh", .02)), 0), 2)
         return v
 
     def status(self) -> dict:

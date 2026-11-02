@@ -4,6 +4,7 @@ import asyncio
 import copy
 import os
 import logging
+import math
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -11,7 +12,7 @@ from pathlib import Path
 import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import vergelijk as vgl, zoeken
 from .brein import Brein
@@ -33,7 +34,7 @@ INSTELBAAR = {
     "net": ["max_afname_kw", "p1"],
     "omvormer": ["vermogen_kw", "type", "host", "modbus_poort", "modbus_unit", "aftoppen_bij_negatieve_prijs", "meter_meet", "regel", "sturen", "gebruiker", "wachtwoord", "serienummer", "accu_omkeren"],
     "zonnepanelen": None,
-    "accu": ["capaciteit_kwh", "max_laden_kw", "max_ontladen_kw", "min_soc", "max_soc", "min_winst_per_kwh", "terugverkopen", "zon_altijd_in_accu", "stormstand"],
+    "accu": ["capaciteit_kwh", "max_laden_kw", "max_ontladen_kw", "min_soc", "max_soc", "min_winst_per_kwh", "terugverkopen", "zon_altijd_in_accu", "stormstand", "onzekerheidsreserve", "slijtage_per_kwh"],
     "laadpaal": ["type", "host", "fasen", "max_stroom_a", "auto_accu_kwh", "gebruiker", "wachtwoord", "serienummer"],
     "warmtepomp": ["type", "relais1", "relais2", "meter", "vermogen_kw", "jaarverbruik_kwh", "blokkeer_uren_per_dag", "max_wacht_achter_elkaar_uur", "niet_wachten_onder_c", "comfort_tijden"],
     "huis": ["jaarverbruik_kwh"],
@@ -47,6 +48,7 @@ INSTELBAAR = {
 class Keuze(BaseModel):
     apparaat: str
     stand: str
+    minuten: int = Field(default=120, ge=15, le=1440)
 
 
 class AutoDoel(BaseModel):
@@ -124,7 +126,7 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
     async def bediening(k: Keuze):
         if k.apparaat not in KEUZES or k.stand not in KEUZES[k.apparaat]:
             raise HTTPException(400, f"Onbekende keuze: {k.apparaat} = {k.stand}")
-        setattr(B().bed, k.apparaat, k.stand)
+        B().bed.kies(k.apparaat, k.stand, k.minuten)
         B().bewaar_bediening()
         STAND = {"auto": "Slim (het brein beslist)", "laden": "laden", "ontladen": "leveren", "vasthouden": "vasthouden",
                  "zelfverbruik": "eigen verbruik", "zon": "alleen op zon", "nu": "nu laden", "stop": "stop",
@@ -213,14 +215,14 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
         nu = datetime.now(timezone.utc)
         a = staat["cfg"]["accu"]
         return opbrengst(B().gesch.rijen(nu - timedelta(days=dagen + 1), nu + timedelta(days=1)), B().prijzen, dagen,
-                         float(a.get("capaciteit_kwh") or 0), B().rendement() ** 0.5)
+                         float(a.get("capaciteit_kwh") or 0), B().rendement() ** 0.5, float(a.get("slijtage_per_kwh", .02)))
 
     @app.get("/api/kosten")
     async def kosten_api(periode: str = "maand"):
         """Kostenoverzicht voor deze maand, vorige maand of dit jaar."""
         from .opbrengst import kosten_periode
         a = staat["cfg"]["accu"]
-        return kosten_periode(B().gesch, B().prijzen, periode, float(a.get("capaciteit_kwh") or 0), B().rendement() ** 0.5)
+        return kosten_periode(B().gesch, B().prijzen, periode, float(a.get("capaciteit_kwh") or 0), B().rendement() ** 0.5, float(a.get("slijtage_per_kwh", .02)))
 
     @app.get("/api/leveranciers")
     async def leveranciers():
@@ -435,6 +437,12 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
             winst = -1
         if not 0 <= winst <= 1:
             raise HTTPException(400, "De minimale winst per kWh moet tussen € 0 en € 1 liggen (bijvoorbeeld 0,03).")
+        try:
+            slijtage = float(cfg["accu"].get("slijtage_per_kwh", .02))
+            assert math.isfinite(slijtage) and 0 <= slijtage <= 1
+            assert isinstance(cfg["accu"].get("onzekerheidsreserve", False), bool)
+        except (TypeError, ValueError, AssertionError):
+            raise HTTPException(400, "Slijtage moet tussen € 0 en € 1 per geladen kWh liggen; reserve moet aan of uit zijn.")
         from .apparaten import dubbel_gebruik
         dubbel = dubbel_gebruik(cfg)
         if dubbel and not cfg.get("simulatie"):

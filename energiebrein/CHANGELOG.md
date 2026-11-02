@@ -1,5 +1,12 @@
 # Wat er nieuw is
 
+## 1.19.0
+
+- **Tijdelijk zelf kiezen, daarna weer Slim.** Bij Bediening kies je 30 minuten, 1, 2, 4 of 24 uur voor handmatige standen. Per apparaat staat de eindtijd erbij. Na afloop keert het apparaat terug naar Slim; de eindtijd overleeft een herstart. Slim kiezen annuleert de timer meteen. Ook nieuwe laadkeuzes via de telefoonmelding gelden standaard twee uur. Bestaande opgeslagen standen zonder timer blijven geldig: kies opnieuw een stand om een eindtijd in te stellen.
+- **Extra reserve als voorspellingen onzeker zijn.** Optioneel bewaart het plan maximaal 10 procentpunt extra acculading boven de ondergrens voor tegenvallende zon of hoger huisverbruik in de komende vier uur. Aan te zetten bij Koppelen → Omvormer en thuisaccu; staat standaard uit. De reserve is zichtbaar bij Bediening en houdt rekening met de grenzen van de accu. Dit is geen noodstroomgarantie en kan extra stroomkosten geven. Bij een omvormer die niet kan vasthouden is het alleen een plandoel.
+- **Kosten eerlijker uitgesplitst.** Kasverschil door de accu, de geschatte verandering van de accuwaarde, slijtage en het netto berekende voordeel staan apart. Slijtage per geladen kWh is instelbaar. Voor oudere metingen zonder aparte laadenergie wordt het netto perioderesultaat als onbekend getoond. Geschatte tarieven worden vermeld en de jaarprojectie op basis van enkele dagen is verwijderd. Bestaande bruto sensoren blijven compatibel.
+- **Gecontroleerd:** 14 nieuwe regressietests, Python- en JavaScript-syntaxcontrole en browsercontrole in een lokale simulatie. Nog geen praktijktest met een echte Home Assistant voor deze wijzigingen.
+
 ## 1.18.0
 
 - **Energiebrein op je eigen Home Assistant-dashboard.** Het brein zet nu elke 30 seconden sensoren in Home Assistant: zon, net, huis, accu (vermogen en lading), auto, warmtepomp, inkoop- en terugleverprijs, wat de accu nu doet en waarom, kosten en besparing van vandaag, en het aantal meldingen. Zoek in Ontwikkelaarstools → Toestanden op `energiebrein`; de namen staan ook in de Documentatie van de add-on. Ze hebben geen eigen apparaat (je ziet ze dus niet onder Instellingen → Entiteiten), maar werken in elke kaart en automatisering en het vermogen en de lading worden ook als geschiedenis bewaard. Uitzetten: `home_assistant: entiteiten: uit`.
