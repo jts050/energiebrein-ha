@@ -936,16 +936,20 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
       <details class="onderdeel" name="kdeel" data-deel="warmtepomp">
         <summary><span class="ico" style="background:color-mix(in srgb,var(--wp) 16%,transparent);color:var(--wp)"><svg><use href="#i-wp"/></svg></span><span class="wat"><b>Warmtepomp</b><span class="stand" id="st-warmtepomp">Nog niet gekoppeld</span></span><i class="lamp" id="lamp-warmtepomp"></i><svg class="pijl" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="inhoud">
-        <label class="f">Koppeling<select id="k-wp-type"><option value="uit">Geen / nog niet</option><option value="meter">Alleen meten (Shelly Pro 3EM of HomeWizard kWh-meter)</option><option value="sgready_shelly">Meten en sturen: SG-ready via Shelly-relais</option></select></label>
+        <label class="f">Koppeling<select id="k-wp-type"><option value="uit">Geen / nog niet</option><option value="meter">Alleen meten: één meter op de groep van de warmtepomp</option><option value="sgready_shelly">Meten en schakelen: meter en SG-ready-schakelaar (mogen aparte Shelly's zijn)</option></select></label>
         <div data-toon="k-wp-type">
-          <div id="wp-sturen">
-          <div class="f2"><label class="f">Relais 1 (SG Ready 1). Bij een Shelly Pro 3: IP/0<input id="k-wp-r1" placeholder="192.168.2.40/0"></label><button class="btn" type="button" data-test="shelly" data-ip="k-wp-r1">Test</button></div>
-          <p class="res" id="r-k-wp-r1"></p>
-          <div class="f2"><label class="f">Relais 2 (SG Ready 2). Bij een Shelly Pro 3: IP/1<input id="k-wp-r2" placeholder="192.168.2.40/1"></label><button class="btn" type="button" data-test="shelly" data-ip="k-wp-r2">Test</button></div>
-          <p class="res" id="r-k-wp-r2"></p>
+          <div class="howto" id="wp-meten"><b>Meten: welke meter ziet wat de warmtepomp verbruikt?</b>
+            <p class="note" style="margin:4px 0 10px">Een Shelly (Pro 3EM, Pro EM, 1PM, 2PM, PM Mini, EM) of een HomeWizard kWh-meter op de groep van de warmtepomp. Bij "Alleen meten" is dit verplicht. Bij "Meten en schakelen" mag je het leeglaten: dan schat het brein het verbruik uit de stand. Heeft de Shelly meer kanalen (zoals een 2PM), zet dan het kanaal achter het IP-adres, bijvoorbeeld 192.168.2.41/1.</p>
+            <div class="f2"><label class="f">IP-adres van de meter<input id="k-wp-meter" placeholder="192.168.2.41 (leeg = schatten)"></label><button class="btn" type="button" data-test="wpmeter" data-ip="k-wp-meter">Test</button></div>
+            <p class="res" id="r-k-wp-meter"></p>
           </div>
-          <div class="f2"><label class="f">Energiemeter warmtepomp (HomeWizard kWh-meter of Shelly Pro 3EM, niet verplicht)<input id="k-wp-meter" placeholder="leeg = schatten uit vermogen en stand"></label><button class="btn" type="button" data-test="wpmeter" data-ip="k-wp-meter">Test</button></div>
-          <p class="res" id="r-k-wp-meter"></p>
+          <div class="howto" id="wp-sturen"><b>Schakelen: welke Shelly bedient de SG-ready-contacten?</b>
+            <p class="note" style="margin:4px 0 10px">Dit mag een andere Shelly zijn dan de meter hierboven. Heeft één Shelly twee relais (zoals een Plus 2PM of Pro 2), vul dan twee keer hetzelfde IP-adres in, met /0 bij relais 1 en /1 bij relais 2. Zijn het twee losse Shelly's, vul dan bij elk relais het eigen IP-adres in.</p>
+            <div class="f2"><label class="f">Relais 1 (SG Ready 1)<input id="k-wp-r1" placeholder="192.168.2.40 of 192.168.2.40/0"></label><button class="btn" type="button" data-test="shelly" data-ip="k-wp-r1">Test</button></div>
+            <p class="res" id="r-k-wp-r1"></p>
+            <div class="f2"><label class="f">Relais 2 (SG Ready 2)<input id="k-wp-r2" placeholder="192.168.2.40/1 of een tweede Shelly"></label><button class="btn" type="button" data-test="shelly" data-ip="k-wp-r2">Test</button></div>
+            <p class="res" id="r-k-wp-r2"></p>
+          </div>
           <div class="f3"><label class="f">Vermogen (kW)<input id="k-wp-kw" type="number" step="0.1" min="0.5"></label><label class="f">Verbruik per jaar (kWh)<input id="k-wp-jaar" type="number" step="100" min="0"></label></div>
           <div class="howto" id="wp-comfort"><b>Comfort gaat voor</b>
             <p class="note" style="margin:4px 0 10px">Het brein laat de warmtepomp alleen even wachten op dure momenten. Binnen deze grenzen merk je daar niets van: een goed geïsoleerd huis blijft wel een uur op temperatuur, en de boiler wordt vóór je douchetijden niet geblokkeerd. Wil je het toch warmer, kies dan bij Bediening → Warmtepomp "Normaal".</p>
@@ -1758,7 +1762,7 @@ $('zoek').onclick=async()=>{
       else if(x.soort==='meter'){knop('Meter warmtepomp',()=>{if($('k-wp-type').value==='uit')$('k-wp-type').value='meter';$('k-wp-meter').value=x.ip;toon();});
         if(/shelly/i.test(x.merk))knop('Als slimme meter',()=>vervangP1('shelly_em',x.ip));}
       else if(k.laadpaal)knop('Koppel',()=>{$('k-lp-type').value=k.laadpaal;$('k-lp-host').value=x.ip;toon();});
-      else if(x.soort==='relais'){knop('Warmtepomp relais 1',()=>{$('k-wp-type').value='sgready_shelly';$('k-wp-r1').value=x.ip;toon();});knop('Relais 2',()=>{$('k-wp-type').value='sgready_shelly';$('k-wp-r2').value=x.ip;toon();});}
+      else if(x.soort==='relais'){knop('Meter warmtepomp',()=>{if($('k-wp-type').value==='uit')$('k-wp-type').value='meter';$('k-wp-meter').value=x.ip;toon();});knop('Warmtepomp relais 1',()=>{$('k-wp-type').value='sgready_shelly';$('k-wp-r1').value=x.ip;toon();});knop('Relais 2',()=>{$('k-wp-type').value='sgready_shelly';$('k-wp-r2').value=x.ip;toon();});}
       else{const c=catInfo(x.merk);const sp=document.createElement('span');sp.className='note';
         sp.textContent=c&&c.status==='ocpp'?'Koppel via OCPP: zie Laadpaal hieronder':(c?CAT.status[c.status]+' · '+c.hoe:'Herkend, koppeling volgt');li.appendChild(sp);
         if(c&&c.status==='ocpp')knop('Kies OCPP',()=>{$('k-lp-type').value='ocpp';toon();});}

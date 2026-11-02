@@ -1,5 +1,10 @@
 # Wat er nieuw is
 
+## 1.16.1
+
+- **Warmtepomp: meter en schakelaar zijn aparte onderdelen.** Bij Koppelen → Warmtepomp staat nu eerst "Meten" (welke meter ziet het verbruik) en daaronder "Schakelen" (welke Shelly bedient de SG-ready-contacten). Dat mogen twee aparte Shelly's zijn, of één met twee kanalen. Heeft een Shelly meerdere kanalen, zet dan het kanaal achter het IP-adres, bijvoorbeeld 192.168.2.41/1.
+- **Bijna elke Shelly werkt nu als warmtepompmeter:** Pro 3EM, Pro EM, EM Gen3, Plus en Pro 1PM, 2PM en 4PM, Plus PM Mini en de oudere EM, 3EM, 1PM en Plug S, naast de HomeWizard kWh-meter. Bij een gevonden Shelly met relais is er nu ook een knop "Meter warmtepomp".
+
 ## 1.16.0
 
 - **Het brein plant met onzekerheid.** Het brein meet hoe vaak de zonvoorspelling en het huisverbruik er bij jou naast zitten, en rekent daarna niet meer op één gok. Het plan kijkt naar een lage, gemiddelde en hoge uitkomst en kiest wat samen het goedkoopst is. Het eerstvolgende uur telt bijna als zeker, na ongeveer 6 uur geldt de volle onzekerheid. Je ziet wat het brein geleerd heeft bij Plan, onder "Wat het brein over je huis weet". Tot er twee dagen metingen zijn, plant het zoals voorheen. Uitzetten kan met `onzekerheid: uit` bij de accu-instellingen.

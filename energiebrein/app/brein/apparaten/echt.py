@@ -556,32 +556,47 @@ class WPMeter:
 
 async def shelly_vermogen_kw(host: str) -> float:
     """Vermogen (kW) van een tussenmeter op de groep van de warmtepomp.
-    Werkt met de HomeWizard kWh-meter (1- en 3-fase, lokale API aanzetten in de HomeWizard-app),
-    Shelly Pro 3EM / 3EM-63 (driefasen), Pro EM / EM Gen3 en de oudere Shelly EM / 3EM."""
+    Werkt met de HomeWizard kWh-meter (1- en 3-fase, lokale API aanzetten in de HomeWizard-app) en met bijna elke Shelly die
+    vermogen meet: Pro 3EM / 3EM-63 (driefasen), Pro EM / EM Gen3, Plus en Pro 1PM / 2PM / 4PM, Plus PM Mini en de oudere
+    Shelly EM, 3EM, 1PM en Plug S. Heeft de Shelly meer kanalen (bijvoorbeeld een 2PM), zet dan het kanaal achter het
+    IP-adres: "192.168.2.41/1". Zonder kanaal geldt kanaal 0 (bij de oudere EM's: alle kanalen samen)."""
+    ip, _, kan = host.strip().partition("/")
+    kanaal = int(kan) if kan.strip().isdigit() else None
+    nr = kanaal or 0
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as s:
         try:                                                 # HomeWizard kWh-meter
-            async with s.get(f"http://{host}/api/v1/data") as r:
+            async with s.get(f"http://{ip}/api/v1/data") as r:
                 if r.status == 200:
                     d = await r.json(content_type=None)
                     if "active_power_w" in d:
                         return abs(float(d["active_power_w"] or 0)) / 1000
         except (aiohttp.ClientError, ValueError):
             pass
-        for pad in ("/rpc/EM.GetStatus?id=0", "/rpc/EM1.GetStatus?id=0", "/status"):
+        # nieuwere Shelly's (Gen2 en Gen3), en daarna de oudere (Gen1)
+        for pad in (f"/rpc/EM.GetStatus?id={nr}", f"/rpc/EM1.GetStatus?id={nr}", f"/rpc/Switch.GetStatus?id={nr}",
+                    f"/rpc/PM1.GetStatus?id={nr}", "/status"):
             try:
-                async with s.get(f"http://{host}{pad}") as r:
+                async with s.get(f"http://{ip}{pad}") as r:
                     if r.status != 200:
                         continue
                     d = await r.json(content_type=None)
-            except aiohttp.ClientError:
+            except (aiohttp.ClientError, ValueError):
+                continue
+            if not isinstance(d, dict):
                 continue
             if "total_act_power" in d:                       # Pro 3EM
                 return abs(float(d["total_act_power"])) / 1000
             if "act_power" in d:                             # EM1 (één kanaal)
                 return abs(float(d["act_power"])) / 1000
-            if "emeters" in d:                               # Gen1 EM / 3EM
-                return abs(sum(float(e.get("power") or 0) for e in d["emeters"])) / 1000
-    raise RuntimeError(f"geen HomeWizard- of Shelly-energiemeter gevonden op {host}. Staat bij HomeWizard de lokale API aan?")
+            if "apower" in d:                                # Plus/Pro 1PM, 2PM, 4PM (schakelaar met meting) en Plus PM Mini
+                return abs(float(d["apower"] or 0)) / 1000
+            for sleutel in ("emeters", "meters"):            # Gen1: EM, 3EM, 1PM, 2.5, Plug S
+                if isinstance(d.get(sleutel), list) and d[sleutel]:
+                    lijst = d[sleutel] if kanaal is None else d[sleutel][kanaal:kanaal + 1]
+                    if lijst:
+                        return abs(sum(float(e.get("power") or 0) for e in lijst)) / 1000
+    raise RuntimeError(f"geen HomeWizard- of Shelly-energiemeter gevonden op {host}. Staat bij HomeWizard de lokale API aan? "
+                       "Heeft de Shelly meer kanalen, zet dan het kanaal erachter, bijvoorbeeld 192.168.2.41/1")
 
 
 # ======================= hulp voor eenvoudige HTTP-apparaten =======================
