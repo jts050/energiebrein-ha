@@ -60,6 +60,7 @@ accu:
   min_soc: 10             # % die altijd in de accu blijft (back-up)
   max_soc: 100
   rendement: 0.92         # rendement heen en terug
+  rendement_leren: auto   # auto = het brein meet 's nachts hoeveel er van het net echt in de accu komt (inclusief omvormer) en past dit rendement voorzichtig aan; uit = alleen je eigen waarde
   slijtage_per_kwh: 0.02     # € per kWh die door de accu gaat (slijtage); terugverkopen moet meer opleveren dan dit
   min_winst_per_kwh: 0.03    # € die laden en later gebruiken of verkopen per kWh minstens moet opleveren, bovenop slijtage
   zon_altijd_in_accu: true   # true = zonne-overschot gaat altijd eerst de accu in zolang die ruimte heeft

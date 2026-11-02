@@ -1188,13 +1188,21 @@ function renderConditie(){const c=S.conditie||{},sec=$('conditie-sectie');if(!se
     vak(cap?`${nf(cap,1)} kWh`:'meet nog',cap?`Gemeten capaciteit (${pct}% van ${nf(c.capaciteit_ingesteld,0)} kWh)`:'Gemeten capaciteit',pct&&pct<80?'slecht':'')+
     vak(c.cycli!=null?nf(c.cycli,1):'–','Keer helemaal rond geweest')+
     vak(c.rendement?Math.round(c.rendement*100)+'%':'meet nog','Rendement van de accu zelf')+
+    (c.systeem?vak(Math.round(c.systeem.gebruikt*100)+'%','Rendement heen en terug in het plan'):'')+
     (c.temperatuur!=null?vak(`${nf(c.temperatuur,0)} °C`,'Temperatuur',(c.temperatuur>=45||c.temperatuur<=0)?'slecht':''):'')+
     (c.modules?vak(c.modules,'Modules',c.max_modules&&c.modules<c.max_modules?'slecht':''):'');
   const m=Object.entries(c.maanden||{}).filter(([k,v])=>v.capaciteit);
   const mnd=k=>new Date(k+'-01').toLocaleDateString('nl-NL',{month:'short',year:'2-digit'});
   $('conditie-uitleg').textContent=(m.length>=2?'Capaciteit per maand: '+m.slice(-6).map(([k,v])=>`${mnd(k)} ${nf(v.capaciteit,1)} kWh`).join(' · ')+'. '
     :'')+(cap?`Gemeten uit ${c.capaciteit_stukken} keer flink laden of ontladen. `:'De gemeten capaciteit verschijnt zodra de accu een paar keer minstens een kwart geladen of ontladen is. ')
-    +'De accu zelf meldt vaak jarenlang 100%; de gemeten capaciteit laat eerder zien of hij slijt.';
+    +'De accu zelf meldt vaak jarenlang 100%; de gemeten capaciteit laat eerder zien of hij slijt.'+systeemUitleg(c.systeem);
+}
+function systeemUitleg(y){if(!y)return '';const p=x=>Math.round(x*100)+'%';
+  if(y.gemeten==null)return ` Het rendement heen en terug (stroom uit het net, door de omvormer en de accu, en weer terug naar het huis) meet het brein 's nachts, zodra het een paar nachten heeft geladen. Tot dan rekent het plan met jouw instelling van ${p(y.ingesteld)}.`;
+  const cel=y.cel_gemeten?'':` De accu zelf is daarbij geschat op ${p(y.eta_cel)}.`;
+  if(!y.actief)return ` Gemeten rendement heen en terug: ${p(y.gemeten)}, maar het leren staat uit (accu.rendement_leren), dus het plan rekent met jouw ${p(y.ingesteld)}.`+cel;
+  const w=y.gewicht<1?` Het brein vertrouwt de meting nog voor ${Math.round(y.gewicht*100)}% en rekent daarom met ${p(y.gebruikt)}.`:` Het plan rekent met ${p(y.gebruikt)}.`;
+  return ` Gemeten uit ${y.kwartieren} kwartieren laden 's nachts: van 100 kWh uit het net die via de accu weer in huis komt, blijft ${Math.round(y.gemeten*100)} kWh over (inclusief de omvormer). Jij stelde ${p(y.ingesteld)} in.`+w+cel;
 }
 function renderTerugblik(){const t=S.terugblik||{},d=t.laatste,sec=$('terugblik-sectie');if(!sec)return;
   if(!d){sec.hidden=true;return;}sec.hidden=false;

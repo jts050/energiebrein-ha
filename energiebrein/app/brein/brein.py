@@ -145,6 +145,7 @@ class Brein:
         self.planner.ondergrens = self._omvormer_grens()
         self.planner.storm = self.stormkwartieren(kw)
         self.planner.onzekerheid = self.voorsp.planner_onzekerheid()
+        self.planner.rendement = self.rendement()
         self.plan = self.planner.maak(kw, m.accu_soc if m else 50.0, self.bed, auto, self.voorsp.wp_dag_kwh)
         if getattr(self, "_auto_net_aan", False):
             self._auto_net_aan = False
@@ -472,7 +473,7 @@ class Brein:
             # Wat het plan voor dit kwartier wil laden, en wat de zon NU echt over heeft. Het plan rekent met de
             # zonvoorspelling; is het bewolkter dan verwacht, dan moet de rest uit het net komen, anders haalt de accu
             # zijn doel niet en mis je straks de dure uren.
-            plan_kw = max(k.accu_kwh, 0.0) / 0.25 / math.sqrt(float(a.get("rendement", 0.9)))
+            plan_kw = max(k.accu_kwh, 0.0) / 0.25 / math.sqrt(self.rendement())
             overschot_nu = m.zon_kw - (m.huis_kw + m.wp_kw + m.auto_kw)
             # Zonne-overschot gaat altijd eerst de accu in zolang die ruimte heeft (instelling, standaard aan). Ook als het plan
             # iets anders verwachtte: de zonvoorspelling zit er vaak naast, en wat de zon NU over heeft, telt.
@@ -519,7 +520,7 @@ class Brein:
                 komend = [x for x in self.plan["kwartieren"] if x.start + timedelta(minutes=15) > nu and x.start < nu + timedelta(hours=24)]
                 goedkoopst = min((x.inkoop for x in komend), default=inkoop)
                 raakt_vol = any(x.soc_na >= a["max_soc"] - 2 for x in komend)
-                rendement = float(a.get("rendement", 0.9))
+                rendement = self.rendement()
                 drempel = float(a.get("slijtage_per_kwh", 0.02)) + max(float(a.get("min_winst_per_kwh", 0.0) or 0.0), 0.0)
                 verkopen = mag_verkopen(a)
                 if not verkopen or (terug * rendement - drempel < goedkoopst and not raakt_vol):
@@ -565,7 +566,7 @@ class Brein:
                 elif self.huis.kan_vasthouden:
                     b["accu"] = "Houdt lading vast voor een duurder moment"
                     straks = next((x for x in self.plan["kwartieren"] if x.start > k.start and x.accu_actie == "ontladen"), None)
-                    eta = math.sqrt(float(a.get("rendement", 0.9)))
+                    eta = math.sqrt(self.rendement())
                     if straks and straks.inkoop > inkoop + 0.005:
                         reden = (f"Om {straks.start.astimezone().strftime('%H:%M')} kost stroom {self._e(straks.inkoop)}; "
                                  f"dan levert de lading meer op dan nu ({self._e(inkoop)}).")
@@ -712,7 +713,7 @@ class Brein:
         vraag_nu = m.huis_kw + m.wp_kw + m.auto_kw - m.zon_kw
         if vraag_nu <= 0.05 or m.accu_soc <= self.ondergrens() + 1:
             return False
-        eta = math.sqrt(self.cfg["accu"]["rendement"])
+        eta = math.sqrt(self.rendement())
         return inkoop * eta > k.waarde_kwh + 0.005
 
     async def _laadpaal(self, m: Meting, k: Kwartier | None) -> str:
@@ -903,6 +904,15 @@ class Brein:
         uit.extend(self.conditie.storingen())
         return uit
 
+    def rendement(self) -> float:
+        """Het rendement heen en terug waarmee het brein rekent. Dat is wat het zelf mat aan stroom die uit het net de accu in
+        gaat en eruit komt (de omvormer verliest er een deel bij), begrensd tot een paar procent rond je instelling.
+        Kan het dat nog niet meten, of staat accu.rendement_leren uit, dan is het gewoon je instelling."""
+        s = (self.conditie.laatst or {}).get("systeem") or {}
+        if s.get("actief") and s.get("gebruikt"):
+            return float(s["gebruikt"])
+        return float(self.cfg["accu"].get("rendement", 0.9))
+
     def _bereken_conditie(self):
         try:
             self.conditie.bereken(getattr(self.huis.omvormer, "bms", None))
@@ -919,7 +929,7 @@ class Brein:
         prijzen = sorted(k.inkoop for k in self.plan["kwartieren"][:96])
         if not prijzen:
             return 0.0
-        return prijzen[len(prijzen) // 2] * math.sqrt(float(self.cfg["accu"].get("rendement", 0.9)))
+        return prijzen[len(prijzen) // 2] * math.sqrt(self.rendement())
 
     def vandaag(self) -> dict:
         v = self.gesch.vandaag()

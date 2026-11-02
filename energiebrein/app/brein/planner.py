@@ -61,8 +61,13 @@ class Planner:
         # Hoeveel de voorspelling van zon en huisverbruik er gemiddeld naast zit (relatief, bijv. 0.25 = 25%). Het plan rekent dan
         # met een lage, gemiddelde en hoge uitkomst en kiest wat gemiddeld het goedkoopst is, in plaats van op één gok te bouwen.
         self.onzekerheid: dict = {}
+        self.rendement: float | None = None    # rendement heen en terug waarmee gerekend wordt; leeg = wat je instelde (zie Conditie)
         self._e_start = 0.0
         self._eindwaarde = 0.0
+
+    def _eta(self) -> float:
+        """Rendement per kant (laden of leveren): de wortel van het rendement heen en terug."""
+        return math.sqrt(float(self.rendement or self.cfg["accu"]["rendement"]))
 
     def ondergrens_pct(self) -> float:
         """De accu ontlaadt niet verder dan de hoogste van twee grenzen: die in Energiebrein en die in de omvormer."""
@@ -99,7 +104,7 @@ class Planner:
         """Wat een gemaakt plan gemiddeld kost over alle uitkomsten (alleen voor tests en de terugblik), inclusief wat de lading
         aan het eind nog waard is."""
         c = self.cfg["accu"]
-        eta = math.sqrt(c["rendement"])
+        eta = self._eta()
         slijtage = float(c.get("slijtage_per_kwh", 0.02))
         min_winst = max(float(c.get("min_winst_per_kwh", 0.0) or 0.0), 0.0)
         aftoppen_mag = self.cfg.get("omvormer", {}).get("aftoppen_bij_negatieve_prijs", True)
@@ -263,7 +268,7 @@ class Planner:
         if hi - lo < 0.5:                                  # grenzen te dicht op elkaar: altijd iets ruimte houden
             hi = min(cap, lo + 0.5)
         aftoppen_mag = self.cfg.get("omvormer", {}).get("aftoppen_bij_negatieve_prijs", True)
-        eta = math.sqrt(c["rendement"])
+        eta = self._eta()
         # Per geladen kWh: slijtage plus de winst die het minstens moet opleveren. Zo laadt en ontlaadt de accu niet
         # voor een paar cent verschil, waar na laadverlies, slijtage en een verkeerde voorspelling niets van overblijft.
         slijtage = float(c.get("slijtage_per_kwh", 0.02))
@@ -341,7 +346,7 @@ class Planner:
         self._redenen(kw)
 
     def _redenen(self, kw: list[Kwartier]) -> None:
-        eta = math.sqrt(self.cfg["accu"]["rendement"])
+        eta = self._eta()
         duur = sorted(k.inkoop for k in kw)
         hoog = duur[int(len(duur) * 0.75)] if duur else 0
         for idx, k in enumerate(kw):

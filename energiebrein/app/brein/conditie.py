@@ -77,6 +77,62 @@ def rendement(rijen: list[dict], cap: float) -> float | None:
     return r if 0.6 < r < 1.05 else None
 
 
+def laadrendement(rijen: list[dict], wp_gemeten: bool) -> dict | None:
+    """Hoeveel van wat het net levert komt als lading in de accu aan? (de omvormer verliest onderweg een paar procent)
+
+    Alleen 's nachts, als de panelen niets doen. Dan is wat de slimme meter méér meet tijdens het laden dan op een rustig moment
+    van die tijd van de nacht, precies wat de accu erbij kreeg plus het verlies onderweg. Het gewone huisverbruik is onafhankelijk
+    van wanneer het brein laadt, dus dat middelt zich weg over genoeg nachten. De warmtepomp en de auto trekken we eraf als die
+    gemeten worden; schat het brein de warmtepomp alleen, dan slaan we kwartieren met de warmtepomp aan over."""
+    nacht = []
+    for r in rijen:
+        if (r.get("n") or 0) < 50 or r.get("net_kwh") is None or r.get("accu_kwh") is None:
+            continue
+        if (r.get("zon_kwh") or 0) > 0.005:
+            continue
+        wp, auto = r.get("wp_kwh") or 0.0, r.get("auto_kwh") or 0.0
+        if wp > 0.03 and not wp_gemeten:
+            continue
+        blok = datetime.fromisoformat(r["start"]).astimezone().hour // 3        # de tijd van de nacht, in blokken van 3 uur
+        nacht.append((blok, r["net_kwh"] - wp - auto, r["accu_kwh"]))
+    stil: dict[int, list[float]] = {}
+    for blok, y, a in nacht:
+        if abs(a) < 0.01:                                  # de accu doet niets: wat het huis zelf vraagt
+            stil.setdefault(blok, []).append(y)
+    basis = {b: sum(v) / len(v) for b, v in stil.items() if len(v) >= 8}
+    erin = extra = 0.0
+    n = 0
+    for blok, y, a in nacht:
+        if a >= 0.5 and blok in basis:                     # minstens 2 kW laden: dan is het verschil groot genoeg om te meten
+            erin, extra, n = erin + a, extra + (y - basis[blok]), n + 1
+    if n < 12 or extra <= 0:
+        return None
+    eta = erin / extra
+    return {"eta": eta, "kwartieren": n} if 0.8 <= eta <= 1.0 else None
+
+
+def systeem_rendement(ingesteld: float, laden: dict | None, cel: float | None, leren: bool = True) -> dict:
+    """Het rendement heen en terug waar het plan mee rekent: stroom uit het net naar de accu, en weer terug naar het huis.
+    Dat is het laadrendement van de omvormer, nog eens het rendement van de omvormer bij leveren (dezelfde als bij laden), en het
+    rendement van de accu zelf. Het brein vertrouwt dat pas helemaal na ruim twaalf uur laden, en wijkt nooit meer dan een paar
+    procent af van wat je zelf instelde: een meting kan ernaast zitten, een instelling ook."""
+    uit = {"ingesteld": round(ingesteld, 3), "gebruikt": round(ingesteld, 3), "gemeten": None, "eta_laden": None, "eta_cel": None,
+           "cel_gemeten": cel is not None, "kwartieren": laden["kwartieren"] if laden else 0, "gewicht": 0.0, "actief": False}
+    if not laden:
+        return uit
+    eta_cel = cel if cel is not None else 0.96                # zonder eigen meting: gebruikelijk voor lithium-ion
+    gemeten = laden["eta"] ** 2 * eta_cel
+    gewicht = min(1.0, laden["kwartieren"] / 48)
+    gebruikt = ingesteld + gewicht * (gemeten - ingesteld)
+    gebruikt = max(ingesteld - 0.06, min(ingesteld + 0.04, gebruikt))
+    gebruikt = max(0.78, min(0.97, gebruikt))
+    uit.update({"gemeten": round(gemeten, 3), "eta_laden": round(laden["eta"], 3), "eta_cel": round(eta_cel, 3),
+                "gewicht": round(gewicht, 2), "gebruikt": round(gebruikt, 3), "actief": bool(leren)})
+    if not leren:
+        uit["gebruikt"] = round(ingesteld, 3)
+    return uit
+
+
 class Conditie:
     def __init__(self, cfg: dict, gesch, data: Path):
         self.cfg, self.gesch = cfg, gesch
@@ -99,6 +155,16 @@ class Conditie:
         recent = [r for r in alles if r["start"] >= (nu - timedelta(days=60)).isoformat()]
         cap, n = capaciteit(recent)
         rend = rendement([r for r in alles if r["start"] >= (nu - timedelta(days=30)).isoformat()], cap or cap_ingesteld)
+        wp = self.cfg.get("warmtepomp") or {}
+        wp_gemeten = wp.get("type") == "meter" or bool(str(wp.get("meter") or "").strip())
+        try:
+            laden = laadrendement([r for r in alles if r["start"] >= (nu - timedelta(days=45)).isoformat()], wp_gemeten)
+        except Exception:
+            log.exception("Laadrendement meten mislukt")
+            laden = None
+        stand = self.cfg["accu"].get("rendement_leren", "auto")
+        leren = not (stand is False or str(stand).lower() in ("uit", "nee", "false", "0"))
+        systeem = systeem_rendement(float(self.cfg["accu"].get("rendement", 0.9)), laden, rend, leren)
         bms = bms or {}
         modules = bms.get("modules")
         if modules:
@@ -108,7 +174,7 @@ class Conditie:
             "fout": bms.get("fout"), "laden_a": bms.get("laden_a"), "ontladen_a": bms.get("ontladen_a"),
             "cycli": round(geleverd / cap_ingesteld, 1) if cap_ingesteld else None,
             "capaciteit": round(cap, 1) if cap else None, "capaciteit_stukken": n, "capaciteit_ingesteld": cap_ingesteld,
-            "rendement": round(rend, 3) if rend else None,
+            "rendement": round(rend, 3) if rend else None, "systeem": systeem,
             "sinds": alles[0]["start"] if alles else None,
         }
         maand = nu.astimezone().strftime("%Y-%m")

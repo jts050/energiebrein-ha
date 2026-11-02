@@ -1,5 +1,11 @@
 # Wat er nieuw is
 
+## 1.17.0
+
+- **Het brein meet zelf hoeveel de accu écht opslaat, inclusief de omvormer.** Eerder mat het alleen het rendement van de accucellen. De omvormer verliest er onderweg nog een paar procent bij, bij laden en bij leveren. Nu kijkt het brein 's nachts, als de zonnepanelen niets doen: hoeveel stroom méér komt er van het net als de accu laadt dan op een rustig moment van diezelfde tijd van de nacht, en hoeveel daarvan komt in de accu terecht? Daaruit volgt het rendement heen en terug van het hele systeem. De warmtepomp en de auto trekt het er af; schat het brein de warmtepomp alleen, dan slaat het die kwartieren over.
+- **Voorzichtig bijgesteld, en altijd zichtbaar.** De meting telt pas helemaal mee na ruim twaalf uur laden (48 kwartieren), en het plan wijkt nooit meer dan 6 procentpunt omlaag of 4 omhoog af van wat je zelf instelde. Bij Thuis → Conditie van de accu staat wat gemeten is, waarmee het plan rekent en wat jij instelde. Het effect op de beslissingen is bescheiden (hooguit enkele tienden van een cent per kWh in de drempel om te laden of leveren), maar het scheelt een stille fout in elke afweging. Liever zelf bepalen? Zet `rendement_leren: uit` bij de accu-instellingen; de meting blijft zichtbaar, het plan rekent dan met jouw waarde.
+- Het kostenoverzicht, de opbrengst en de terugblik gebruiken hetzelfde rendement als het plan.
+
 ## 1.16.1
 
 - **Warmtepomp: meter en schakelaar zijn aparte onderdelen.** Bij Koppelen → Warmtepomp staat nu eerst "Meten" (welke meter ziet het verbruik) en daaronder "Schakelen" (welke Shelly bedient de SG-ready-contacten). Dat mogen twee aparte Shelly's zijn, of één met twee kanalen. Heeft een Shelly meerdere kanalen, zet dan het kanaal achter het IP-adres, bijvoorbeeld 192.168.2.41/1.

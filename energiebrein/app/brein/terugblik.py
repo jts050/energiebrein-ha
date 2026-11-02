@@ -26,7 +26,7 @@ def _k(x: float) -> str:
 
 
 def bereken(cfg: dict, rijen: list[dict], prijs, soc_begin: float | None, ondergrens: float | None,
-            voorspeld: list[dict] | None = None) -> dict | None:
+            voorspeld: list[dict] | None = None, rendement: float | None = None) -> dict | None:
     """rijen: de kwartieren van één dag uit de geschiedenis. prijs: object met inkoop(beurs, t) en teruglever(beurs, t)."""
     goed = [r for r in rijen if (r.get("n") or 0) >= 3 and r.get("soc") is not None]
     if len(goed) < 88:                                   # te veel gaten (programma uit): geen eerlijke vergelijking
@@ -42,6 +42,7 @@ def bereken(cfg: dict, rijen: list[dict], prijs, soc_begin: float | None, onderg
                            wp_kwh=max(r.get("wp_kwh") or 0, 0), auto_kwh=max(r.get("auto_kwh") or 0, 0)))
     begin = soc_begin if soc_begin is not None else goed[0]["soc"]
     pl = Planner(cfg)
+    pl.rendement = rendement
     pl.ondergrens = ondergrens
     pl.eind_soc = goed[-1]["soc"]
     pl._accu(kw, begin)
@@ -128,7 +129,7 @@ class Terugblik:
             tot = van + timedelta(days=1)
             try:
                 r = bereken(brein.cfg, brein.gesch.rijen(van, tot), brein.prijzen, brein.gesch.soc_voor(van),
-                            brein._omvormer_grens(), brein.gesch.voorspellingen(van, tot))
+                            brein._omvormer_grens(), brein.gesch.voorspellingen(van, tot), brein.rendement())
             except Exception:
                 log.exception("Terugblik voor %s mislukt", dag)
                 continue
