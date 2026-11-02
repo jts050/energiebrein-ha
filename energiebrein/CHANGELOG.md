@@ -1,5 +1,9 @@
 # Wat er nieuw is
 
+## 1.18.0
+
+- **Energiebrein op je eigen Home Assistant-dashboard.** Het brein zet nu elke 30 seconden sensoren in Home Assistant: zon, net, huis, accu (vermogen en lading), auto, warmtepomp, inkoop- en terugleverprijs, wat de accu nu doet en waarom, kosten en besparing van vandaag, en het aantal meldingen. Zoek in Ontwikkelaarstools → Toestanden op `energiebrein`; de namen staan ook in de Documentatie van de add-on. Ze hebben geen eigen apparaat (je ziet ze dus niet onder Instellingen → Entiteiten), maar werken in elke kaart en automatisering en het vermogen en de lading worden ook als geschiedenis bewaard. Uitzetten: `home_assistant: entiteiten: uit`.
+
 ## 1.17.0
 
 - **Het brein meet zelf hoeveel de accu écht opslaat, inclusief de omvormer.** Eerder mat het alleen het rendement van de accucellen. De omvormer verliest er onderweg nog een paar procent bij, bij laden en bij leveren. Nu kijkt het brein 's nachts, als de zonnepanelen niets doen: hoeveel stroom méér komt er van het net als de accu laadt dan op een rustig moment van diezelfde tijd van de nacht, en hoeveel daarvan komt in de accu terecht? Daaruit volgt het rendement heen en terug van het hele systeem. De warmtepomp en de auto trekt het er af; schat het brein de warmtepomp alleen, dan slaat het die kwartieren over.

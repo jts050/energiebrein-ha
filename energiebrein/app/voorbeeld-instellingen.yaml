@@ -122,3 +122,6 @@ auto:
 meldingen:
   telefoon: ""
   bij_opgelost: true
+
+home_assistant:
+  entiteiten: aan        # aan = het brein zet zijn gegevens als sensoren in Home Assistant (sensor.energiebrein_zon, _accu_lading, _inkoopprijs, enzovoort) voor je dashboard; uit = niet

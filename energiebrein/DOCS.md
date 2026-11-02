@@ -24,6 +24,14 @@ Alles staat in de map `addon_configs/local_energiebrein` (te zien via de Samba-a
 
 Deze map zit in elke Home Assistant-back-up. Kom je van de Windows-versie, zet dan je oude `config.yaml` en de map `data` hier neer en herstart de add-on. Dan gaat het brein verder waar het was.
 
+## Op je eigen dashboard
+
+Energiebrein zet elke 30 seconden zijn gegevens als sensoren in Home Assistant. Je vindt ze bij Ontwikkelaarstools → Toestanden door te zoeken op `energiebrein`, en je kunt ze kiezen in elke kaart en automatisering:
+
+`sensor.energiebrein_zon`, `_net`, `_huis`, `_accu_vermogen`, `_accu_lading`, `_auto`, `_warmtepomp`, `_warmtepomp_stand`, `_inkoopprijs`, `_terugleverprijs`, `_accu_actie`, `_laadpaal_actie`, `_reden`, `_kosten_vandaag`, `_bespaard_vandaag`, `_afname_vandaag`, `_teruglevering_vandaag`, `_zon_vandaag` en `_meldingen`.
+
+Na een herstart van Home Assistant zijn ze binnen een halve minuut weer terug. Uitzetten kan met `home_assistant: entiteiten: uit` in `config.yaml`.
+
 ## Belangrijk
 
 - **Eén brein tegelijk.** Stop Energiebrein op je pc als het hier draait, anders sturen twee programma's dezelfde accu.

@@ -92,6 +92,8 @@ class Brein:
                        asyncio.create_task(self._auto_lus())]
         from .telefoon import luister
         self._taken.append(asyncio.create_task(luister(self.knop_op_melding)))
+        from .ha_entiteiten import lus as entiteiten_lus
+        self._taken.append(asyncio.create_task(entiteiten_lus(self)))
         self._gestart = True
 
     async def pas_licentie_toe(self):
