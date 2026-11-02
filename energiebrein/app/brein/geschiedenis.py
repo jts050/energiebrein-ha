@@ -8,7 +8,7 @@ from pathlib import Path
 from .model import Meting, KWARTIER_H
 
 VELDEN = ["net_kwh", "zon_kwh", "accu_kwh", "auto_kwh", "wp_kwh", "huis_kwh", "kosten", "kosten_zonder", "soc", "beurs",
-          "afname_kwh", "terug_kwh", "inkoop", "terug"]     # inkoop/terug: de echte prijs van dat kwartier (€/kWh)
+          "afname_kwh", "terug_kwh", "inkoop", "terug", "accu_geladen_kwh"]     # inkoop/terug: de echte prijs van dat kwartier (€/kWh)
 
 
 class Geschiedenis:
@@ -59,6 +59,7 @@ class Geschiedenis:
         r["net_kwh"] += net
         r["zon_kwh"] += m.zon_kw * h
         r["accu_kwh"] += m.accu_kw * h
+        r["accu_geladen_kwh"] += max(m.accu_kw, 0.0) * h
         r["auto_kwh"] += m.auto_kw * h
         r["wp_kwh"] += m.wp_kw * h
         r["huis_kwh"] += m.huis_kw * h
@@ -106,4 +107,4 @@ class Geschiedenis:
         return {"kosten": som("kosten"), "kosten_zonder_accu": som("kosten_zonder"),
                 "zon_kwh": som("zon_kwh"), "afname_kwh": sum(max(r["net_kwh"] or 0, 0) for r in rows),
                 "teruglevering_kwh": -sum(min(r["net_kwh"] or 0, 0) for r in rows), "kwartieren": len(rows),
-                "soc_begin": begin}
+                "soc_begin": begin, "accu_geladen_kwh": som("accu_geladen_kwh")}

@@ -1,7 +1,7 @@
 """Gedeelde datatypes. Vermogens in kW, energie in kWh. Netvermogen: + = afname, - = teruglevering."""
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 KWARTIER_H = 0.25
 
@@ -70,6 +70,32 @@ class Bediening:
     auto_zonder: str = "zon"           # zonder vertrek: zon (alleen overschot) of goedkoop
     warmtepomp: str = "auto"     # auto / boost / normaal / wacht
     zon: str = "auto"            # auto (aftoppen bij negatieve prijs) / altijd
+
+    tot: dict = field(default_factory=dict)  # UTC eindtijd per tijdelijke stand
+
+    def kies(self, apparaat: str, stand: str, minuten: int = 120, nu=None):
+        nu = nu or datetime.now(timezone.utc)
+        setattr(self, apparaat, stand)
+        self.tot.pop(apparaat, None)
+        if stand != "auto":
+            self.tot[apparaat] = (nu + timedelta(minutes=minuten)).isoformat()
+
+    def verlopen(self, nu=None) -> list[str]:
+        nu = nu or datetime.now(timezone.utc)
+        uit = []
+        for apparaat, eind in list(self.tot.items()):
+            if apparaat not in ("accu", "laadpaal", "warmtepomp", "zon"):
+                self.tot.pop(apparaat, None)
+                continue
+            try:
+                klaar = datetime.fromisoformat(eind) <= nu
+            except (ValueError, TypeError):
+                klaar = True  # beschadigde of tijdzoneloze eindtijd: terug naar Slim
+            if klaar:
+                setattr(self, apparaat, "auto")
+                self.tot.pop(apparaat, None)
+                uit.append(apparaat)
+        return uit
 
     def dict(self):
         return asdict(self)
