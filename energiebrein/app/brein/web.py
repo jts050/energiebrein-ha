@@ -51,6 +51,11 @@ class Keuze(BaseModel):
     minuten: int = Field(default=120, ge=15, le=1440)
 
 
+class WarmteTemperatuur(BaseModel):
+    deel: str
+    temperatuur: float
+
+
 class AutoDoel(BaseModel):
     kwh: float
     vertrek: str
@@ -109,6 +114,48 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
     @app.get("/api/status")
     async def status():
         return B().status()
+
+    async def warmtegegevens():
+        import aiohttp
+        from . import telefoon, warmte
+        if staat["cfg"].get("simulatie") or not telefoon.beschikbaar():
+            raise HTTPException(503, "Warmtepompgegevens werken via Home Assistant in je eigen huis")
+        entity = staat["cfg"].get("warmtepomp", {}).get("thermostaat", "")
+        try:
+            warmte.entiteiten(entity)
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                async with session.get(f"{telefoon.HA}/states", headers=telefoon._kop()) as response:
+                    response.raise_for_status()
+                    return warmte.overzicht(await response.json(), entity)
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from error
+        except Exception as error:
+            log.warning("Warmtepompgegevens ophalen mislukt: %s", type(error).__name__)
+            raise HTTPException(502, "Warmtepompgegevens zijn tijdelijk niet bereikbaar") from error
+
+    @app.get("/api/warmtepomp")
+    async def warmtepompgegevens():
+        return await warmtegegevens()
+
+    @app.post("/api/warmtepomp/temperatuur")
+    async def warmtetemperatuur(keuze: WarmteTemperatuur):
+        import aiohttp
+        from . import telefoon, warmte
+        data = await warmtegegevens()
+        try:
+            entity, value = warmte.controleer_temperatuur(data, keuze.deel, keuze.temperatuur)
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from error
+        domain = entity.split(".", 1)[0]
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                async with session.post(f"{telefoon.HA}/services/{domain}/set_temperature",
+                        headers=telefoon._kop(), json={"entity_id": entity, "temperature": value}) as response:
+                    response.raise_for_status()
+        except Exception as error:
+            raise HTTPException(502, "Instelling kon niet naar Home Assistant worden verstuurd") from error
+        B().logboek.schrijf("handmatig", f"{'Kamertemperatuur' if keuze.deel == 'huis' else 'Warm water'} ingesteld op {value:g} °C", "warmtepomp")
+        return {"ok": True, "temperatuur": value}
 
     @app.get("/api/plan")
     async def plan():
