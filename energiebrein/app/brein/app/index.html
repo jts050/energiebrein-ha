@@ -740,6 +740,8 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         <div class="blok"><h2>Wat er gaat gebeuren</h2><ul class="acties" id="acties"></ul></div>
         <div class="kolrechts">
           <div class="blok"><h2>Verwachting</h2><div class="cijfers" id="verwachting"></div></div>
+          <div class="blok"><h2>Voordeel slim verwarmen</h2><div id="wp-voordeel"></div></div>
+          <div class="blok"><h2>Warmtepomp in de avond</h2><div class="cijfers" id="wp-avondprofiel"></div></div>
           <div class="blok"><h2>Wat het brein over je huis weet</h2><div class="ai" id="ai"></div></div>
         </div>
       </div>
@@ -953,6 +955,12 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
           <div class="howto" id="wp-thermo"><b>Thermostaat in Home Assistant</b>
             <p class="note" style="margin:4px 0 10px">Het brein zet de gewenste kamertemperatuur iets hoger als stroom goedkoop is of de zon over heeft, en iets lager als stroom duur is. Daarna zet het hem terug naar jouw eigen waarde. Dit werkt alleen als Energiebrein als add-on in Home Assistant draait. Voeg bij ATAG eerst de ATAG-koppeling toe in Home Assistant (Instellingen → Apparaten en diensten) en vul hier de naam van de thermostaat in, te vinden onder Ontwikkelaarstools → Toestanden (begint met climate.).</p>
             <div class="f3"><label class="f">Thermostaat<input id="k-wp-thermo" placeholder="climate.atag_one"></label><label class="f">Hoger bij goedkoop (°C)<input id="k-wp-hoger" type="number" step="0.5" min="0" max="3"></label><label class="f">Lager bij duur (°C)<input id="k-wp-lager" type="number" step="0.5" min="0" max="3"></label></div>
+            <label class="f"><span><input id="k-wp-gasloos" type="checkbox"> Gasloos: toon elektrische installatie</span></label>
+            <label class="f">Gewoonlijk thuis om<input id="k-wp-thuis" type="time"><small>Rustig vooruitverwarmen kiest een gunstig uur in de vier uur hiervoor. Leeg: gebruik de gemeten avondpiek zodra die bekend is.</small></label>
+            <label class="f"><span><input id="k-wp-rustig" type="checkbox"> Rustig vooruitverwarmen (maximaal +0,5 °C, geen verlaging)</span></label>
+            <label class="f"><span><input id="k-wp-water" type="checkbox"> Warm water voorbereiden vóór douche- en comforttijden (maximaal +2 °C)</span></label>
+            <label class="f">Geschat extra stroomverbruik per warmwaterblok (kWh)<input id="k-wp-water-kwh" type="number" min="0" max="5" step="0.1"></label>
+            <p class="note">Warmwaterplanning gebruikt je bestaande actieve warmwaterregeling. Het brein schakelt geen bedrijfsmodus, elektrisch element of legionellaprogramma om. De opwarmduur en het stroomverbruik zijn schattingen; je normale warmwaterinstelling blijft behouden.</p>
           </div>
           <div class="howto" id="wp-sturen"><b>Schakelen: welke Shelly bedient de SG-ready-contacten?</b>
             <p class="note" style="margin:4px 0 10px">Dit mag een andere Shelly zijn dan de meter hierboven. Heeft één Shelly twee relais (zoals een Plus 2PM of Pro 2), vul dan twee keer hetzelfde IP-adres in, met /0 bij relais 1 en /1 bij relais 2. Zijn het twee losse Shelly's, vul dan bij elk relais het eigen IP-adres in.</p>
@@ -1468,7 +1476,7 @@ function renderPlan(){
   K.forEach((k,i)=>{const x=L+i*cw,yt=y(Math.max(k.inkoop,0)),y0=y(0),d=new Date(k.start);
     g+=`<rect x="${x+0.5}" y="${Math.min(yt,y0)}" width="${Math.max(cw-1,1)}" height="${Math.max(Math.abs(y0-yt),1)}" rx="1.2" fill="${verkoopt(k)?'url(#verkoop)':KLEUR[k.accu_actie]}" opacity=".92"/>`;
     if(k.auto_kwh>0.01)g+=`<rect x="${x+0.5}" y="${y0+5}" width="${Math.max(cw-1,1)}" height="5" rx="2" fill="var(--auto)"/>`;
-    if(k.wp_stand==='boost')g+=`<rect x="${x+0.5}" y="${y0+12}" width="${Math.max(cw-1,1)}" height="5" rx="2" fill="var(--wp)"/>`;
+    if(k.wp_stand==='boost'||k.water_boost)g+=`<rect x="${x+0.5}" y="${y0+12}" width="${Math.max(cw-1,1)}" height="5" rx="2" fill="var(--wp)"/>`;
     if(d.getMinutes()===0){
       if(d.getHours()===0&&i>0){dagen+=`<line x1="${x}" x2="${x}" y1="${T}" y2="${S0+SH}" stroke="var(--muted)" stroke-opacity=".5" stroke-dasharray="1 4"/>`;
         as+=`<text class="dagnaam" x="${x+4}" y="${H-8}">${esc(dag(k.start).slice(0,2))}</text>`;}
@@ -1493,7 +1501,25 @@ function renderPlan(){
   // wat er gaat gebeuren: blokken in gewone taal; heel kleine stapjes weglaten
   const duur=n=>{const u=n/4;return u<1?`${n*15} min`:`${nf(u,u%1?1:0)} uur`;};
   $('acties').innerHTML=planBlokken(K).filter(b=>b.t==='rust'?b.n>=8:b.kwh>=0.3).slice(0,8).map(b=>
-    `<li><span class="t">${kortDag(b.start)}${tijd(b.start)}–${tijd(b.tot)}<small>${duur(b.n)}</small></span><span class="d ${b.verkoop?'streep':''}" style="background:${KLEUR[b.t]}"></span><span class="w"><b>${b.t==='rust'?'Accu wacht':(t=>'Accu '+t[0].toLowerCase()+t.slice(1))(blokTekst(b))}</b><span>${esc(b.reden.split('. ')[0].replace(/\.$/,''))}. Gemiddeld ${eur(b.gem)} per kWh.</span></span></li>`).join('');
+    `<li data-start="${b.start}"><span class="t">${kortDag(b.start)}${tijd(b.start)}–${tijd(b.tot)}<small>${duur(b.n)}</small></span><span class="d ${b.verkoop?'streep':''}" style="background:${KLEUR[b.t]}"></span><span class="w"><b>${b.t==='rust'?'Accu wacht':(t=>'Accu '+t[0].toLowerCase()+t.slice(1))(blokTekst(b))}</b><span>${esc(b.reden.split('. ')[0].replace(/\.$/,''))}. Gemiddeld ${eur(b.gem)} per kWh.</span></span></li>`).join('');
+  const voordeel=P.warmtevoordeel||{},v=voordeel.prijsvoordeel_huis;
+  $('wp-voordeel').innerHTML=v==null?'<p class="note">Nog geen warmtevergelijking beschikbaar.</p>':
+    `<p class="feit"><b>${eur(Math.abs(v))} ${v>=0?'verwacht prijsvoordeel':'verwachte meerkosten'} huisverwarming</b></p><p class="note">${esc(voordeel.uitleg||'')}</p>`+
+    `<p class="note">Extra warmwaterblok: circa ${eur(voordeel.warmwater_extra_kosten||0)} aan stroom in deze planhorizon. Dit is extra verbruik; een latere besparing is nog niet aangetoond.</p><p class="note">Werkelijk bespaard: nog niet betrouwbaar vast te stellen. Het brein toont geen fictieve factuurkorting.</p>`;
+  const profiel=P.warmteprofiel||{};
+  $('wp-avondprofiel').innerHTML=profiel.voldoende?
+    `<p class="feit"><b>Meeste verbruik rond ${profiel.piek_uur}:00</b><br>Gemiddeld ${nf(profiel.piek_kw,2)} kW, over ${profiel.avonden} gemeten avonden. ${P.warmte_thuiskomst?`Vooruitverwarmen richt zich op thuiskomst om ${esc(P.warmte_thuiskomst)}.`:"Rustig vooruitverwarmen kiest een gunstig uur in de vier uur vóór de avondpiek."}</p>`+
+    (profiel.uren||[]).map(r=>`<div class="cijfer"><span>${r.uur}:00–${r.uur+1}:00</span><b>${nf(r.gem_kw,2)} kW</b></div>`).join('')+
+    '<p class="note">Een verbruikspatroon is geen bewijs van besparing; weer, douchen en je temperatuurkeuze spelen mee.</p>':
+    `<p class="note">${esc(profiel.reden||'Avondmetingen verzamelen…')}</p>`;
+  const warmte=(P.warmteblokken||[]).map(b=>{
+    const minuten=Math.round((new Date(b.tot)-new Date(b.start))/60000),water=b.soort==='water';
+    const doel=water?WARMTE?.water?.doel:WARMTE?.huis?.doel;
+    const doeltekst=doel!=null?`ATAG ingesteld op dit moment: ${nf(doel,1)} °C. `:'';
+    return `<li data-start="${b.start}"><span class="t">${kortDag(b.start)}${tijd(b.start)}–${tijd(b.tot)}<small>${minuten} min</small></span><span class="d" style="background:var(--wp)"></span><span class="w"><b>${water?'Warm water voorbereiden':b.stand==='boost'?'Huis vooruitverwarmen':'Huisverwarming even lager'} · ${b.delta>0?'+':''}${nf(b.delta,1)} °C</b><span>${esc(doeltekst+b.reden)} Geschat ${nf(b.kwh,1)} kWh. De warmtepomp bepaalt zelf wanneer hij werkelijk verwarmt.</span></span></li>`;
+  });
+  $('acties').insertAdjacentHTML('beforeend',warmte.join(''));
+  const actielijst=$('acties');actielijst.replaceChildren(...[...actielijst.children].sort((a,b)=>new Date(a.dataset.start)-new Date(b.dataset.start)));
   const sv=P.samenvatting||{};
   if(sv.kwartieren)$('verwachting').innerHTML=`<div class="cijfer"><b>${eur(Math.abs(sv.kosten_plan))}</b><span>${sv.kosten_plan<0?'Opbrengst':'Stroomkosten'} tot ${dag(sv.tot)} ${tijd(sv.tot)}</span></div><div class="cijfer goed"><b>${eur(sv.besparing)}</b><span>Minder dan zonder accu${Math.abs(sv.voorraad_kwh||0)>=0.5?`<small>${sv.voorraad_kwh>0?'inclusief':'min'} de waarde van ${nf(Math.abs(sv.voorraad_kwh))} kWh die er aan het eind ${sv.voorraad_kwh>0?'meer':'minder'} in zit</small>`:''}</span></div><div class="cijfer"><b>${tijd(sv.goedkoopste)}</b><span>Goedkoopste moment</span></div><div class="cijfer"><b>${tijd(sv.duurste)}</b><span>Duurste moment</span></div>`;
 }
@@ -1501,7 +1527,7 @@ function renderPlan(){
 function zetFocus(i){focusIdx=i;const b=$('fband');if(b&&PLANGEO){b.setAttribute('x',PLANGEO.L+i*PLANGEO.cw);b.setAttribute('width',Math.max(PLANGEO.cw,2));}uitleg();}
 function uitleg(){const k=P&&P.kwartieren[focusIdx];if(!k)return;
   const wat=k.accu_actie==='laden'?'accu laadt':verkoopt(k)?'accu verkoopt aan het net':k.accu_actie==='ontladen'?'accu voedt het huis':'accu wacht';
-  $('uitleg').innerHTML=`<b>${focusIdx===0?'Nu':dag(k.start).slice(0,2)+' '+tijd(k.start)} · ${eur(k.inkoop)} per kWh · ${wat} · lading naar ${nf(k.soc_na,0)}%</b><span>${esc(k.reden)}</span>`;}
+  $('uitleg').innerHTML=`<b>${focusIdx===0?'Nu':dag(k.start).slice(0,2)+' '+tijd(k.start)} · ${eur(k.inkoop)} per kWh · ${wat} · lading naar ${nf(k.soc_na,0)}%</b><span>${esc(k.reden)}${k.wp_stand==='boost'?' Huis vooruitverwarmen gepland.':''}${k.water_boost?' Warm water voorbereiden gepland.':''}</span>`;}
 
 let OPB=null,KP='maand';
 async function laadOpbrengst(){try{OPB=await api('/api/opbrengst?dagen=30');renderKostenKort();}catch(e){}}
@@ -1721,7 +1747,7 @@ async function laadInstellingen(){
   zet('k-accu-cap',c.accu.capaciteit_kwh);const okw=+c.omvormer.vermogen_kw||Math.max(c.accu.max_laden_kw,c.accu.max_ontladen_kw,1);zet('k-omv-kw',okw);zet('k-accu-in',Math.round(c.accu.max_laden_kw/okw*100));zet('k-accu-uit',Math.round(c.accu.max_ontladen_kw/okw*100));zet('k-accu-min',c.accu.min_soc);zet('k-accu-max',c.accu.max_soc??100);accuKw();
   zet('k-p1-type',(c.net.p1||{}).type||'uit');zet('k-p1-host',(c.net.p1||{}).host);zet('k-maxkw',c.net.max_afname_kw);
   zet('k-lp-type',c.laadpaal.type||'uit');const ca=c.auto||{};zet('k-car-merk',ca.merk||'uit');zet('k-car-gebr',ca.gebruiker);zet('k-car-ww',ca.wachtwoord);zet('k-car-spin',ca.spin);zet('k-car-vin',ca.vin);zet('k-lp-gebr',c.laadpaal.gebruiker);zet('k-lp-ww',c.laadpaal.wachtwoord);zet('k-lp-serie',c.laadpaal.serienummer);zet('k-lp-fasen',c.laadpaal.fasen);zet('k-lp-a',c.laadpaal.max_stroom_a);zet('k-lp-auto',c.laadpaal.auto_accu_kwh);
-  zet('k-wp-type',c.warmtepomp.type||'uit');zet('k-wp-r1',c.warmtepomp.relais1);zet('k-wp-r2',c.warmtepomp.relais2);zet('k-wp-meter',c.warmtepomp.meter);zet('k-wp-thermo',c.warmtepomp.thermostaat);zet('k-wp-hoger',c.warmtepomp.verhoging??1);zet('k-wp-lager',c.warmtepomp.verlaging??1);zet('k-wp-kw',c.warmtepomp.vermogen_kw);zet('k-wp-jaar',c.warmtepomp.jaarverbruik_kwh);zet('k-wp-comfort',(c.warmtepomp.comfort_tijden||[]).join(', '));zet('k-wp-blok',c.warmtepomp.blokkeer_uren_per_dag);zet('k-wp-run',c.warmtepomp.max_wacht_achter_elkaar_uur??1.5);zet('k-wp-min',c.warmtepomp.niet_wachten_onder_c??2);
+  zet('k-wp-type',c.warmtepomp.type||'uit');zet('k-wp-r1',c.warmtepomp.relais1);zet('k-wp-r2',c.warmtepomp.relais2);zet('k-wp-meter',c.warmtepomp.meter);zet('k-wp-thermo',c.warmtepomp.thermostaat);zet('k-wp-thuis',c.warmtepomp.thuiskomst||'');$('k-wp-gasloos').checked=!!c.warmtepomp.gasloos;$('k-wp-rustig').checked=!!c.warmtepomp.rustig_voorverwarmen;$('k-wp-water').checked=!!c.warmtepomp.warmwater_slim;zet('k-wp-water-kwh',c.warmtepomp.warmwater_extra_kwh??1);zet('k-wp-hoger',c.warmtepomp.verhoging??1);zet('k-wp-lager',c.warmtepomp.verlaging??1);zet('k-wp-kw',c.warmtepomp.vermogen_kw);zet('k-wp-jaar',c.warmtepomp.jaarverbruik_kwh);zet('k-wp-comfort',(c.warmtepomp.comfort_tijden||[]).join(', '));zet('k-wp-blok',c.warmtepomp.blokkeer_uren_per_dag);zet('k-wp-run',c.warmtepomp.max_wacht_achter_elkaar_uur??1.5);zet('k-wp-min',c.warmtepomp.niet_wachten_onder_c??2);
   $('vlakken').innerHTML='';(c.zonnepanelen||[]).forEach(vlakRij);
   zet('k-lat',c.locatie.breedte);zet('k-lon',c.locatie.lengte);
   zet('k-contract',c.prijzen.contract);zet('k-sald',c.prijzen.saldering||'auto');zet('k-opslag',c.prijzen.opslag);zet('k-terug',c.prijzen.terugleverkosten);zet('k-vin',c.prijzen.vast_inkoop);zet('k-vterug',c.prijzen.vast_teruglever);
@@ -1822,7 +1848,7 @@ $('kform').addEventListener('submit',async e=>{e.preventDefault();
     accu:{capaciteit_kwh:n('k-accu-cap'),max_laden_kw:Math.round(n('k-omv-kw')*(n('k-accu-in')||100))/100,max_ontladen_kw:Math.round(n('k-omv-kw')*(n('k-accu-uit')||100))/100,min_soc:n('k-accu-min'),max_soc:n('k-accu-max')||100,
       min_winst_per_kwh:Number.isFinite(n('k-accu-winst'))?n('k-accu-winst'):0.03,terugverkopen:$('k-verkopen').checked,zon_altijd_in_accu:$('k-zon-accu').checked,stormstand:$('k-storm').checked,onzekerheidsreserve:$('k-reserve').checked,slijtage_per_kwh:n('k-slijtage')},
     laadpaal:{type:$('k-lp-type').value,host:$('k-lp-host').value.trim(),gebruiker:$('k-lp-gebr').value.trim(),wachtwoord:$('k-lp-ww').value,serienummer:$('k-lp-serie').value.trim(),fasen:parseInt($('k-lp-fasen').value),max_stroom_a:n('k-lp-a'),auto_accu_kwh:n('k-lp-auto')},
-    warmtepomp:{type:$('k-wp-type').value,relais1:$('k-wp-r1').value.trim(),relais2:$('k-wp-r2').value.trim(),meter:$('k-wp-meter').value.trim(),thermostaat:$('k-wp-thermo').value.trim(),verhoging:n('k-wp-hoger'),verlaging:n('k-wp-lager'),vermogen_kw:n('k-wp-kw'),jaarverbruik_kwh:n('k-wp-jaar'),comfort_tijden:$('k-wp-comfort').value.split(/[,;]/).map(x=>x.trim().replace(/\s+/g,'').replace(/–/g,'-')).filter(x=>/^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(x)),blokkeer_uren_per_dag:n('k-wp-blok'),max_wacht_achter_elkaar_uur:n('k-wp-run'),niet_wachten_onder_c:n('k-wp-min')},
+    warmtepomp:{type:$('k-wp-type').value,relais1:$('k-wp-r1').value.trim(),relais2:$('k-wp-r2').value.trim(),meter:$('k-wp-meter').value.trim(),thermostaat:$('k-wp-thermo').value.trim(),thuiskomst:$('k-wp-thuis').value,gasloos:$('k-wp-gasloos').checked,rustig_voorverwarmen:$('k-wp-rustig').checked,warmwater_slim:$('k-wp-water').checked,warmwater_extra_kwh:n('k-wp-water-kwh'),verhoging:n('k-wp-hoger'),verlaging:n('k-wp-lager'),vermogen_kw:n('k-wp-kw'),jaarverbruik_kwh:n('k-wp-jaar'),comfort_tijden:$('k-wp-comfort').value.split(/[,;]/).map(x=>x.trim().replace(/\s+/g,'').replace(/–/g,'-')).filter(x=>/^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(x)),blokkeer_uren_per_dag:n('k-wp-blok'),max_wacht_achter_elkaar_uur:n('k-wp-run'),niet_wachten_onder_c:n('k-wp-min')},
     huis:{jaarverbruik_kwh:n('k-huis')},
     zonvoorspelling:{solcast_sleutel:$('k-sc-sleutel').value.trim(),solcast_sites:$('k-sc-sites').value.trim()},
     meldingen:{telefoon:$('k-tel').value,bij_opgelost:$('k-tel-op').checked},
@@ -2125,7 +2151,8 @@ function renderWarmte(data){
   }root.append(box);
  }
  const sensors=$('warmte-sensoren');sensors.replaceChildren();
- for(const row of data.entiteiten||[]){const item=document.createElement('div'),name=document.createElement('span'),value=document.createElement('b');name.textContent=row.naam.replace(/^ATAG · Energion · Warmtepomp\s*(Ariston\s*)?/,'');value.textContent=['unknown','unavailable'].includes(row.waarde)?'Niet beschikbaar':row.waarde+(row.eenheid?' '+row.eenheid:'');item.append(name,value);sensors.append(item);}
+ const waarde=row=>{if(row.waarde==null||['unknown','unavailable'].includes(row.waarde))return 'Niet beschikbaar';if(row.waarde==='on')return 'Aan';if(row.waarde==='off')return 'Uit';const n=Number(row.waarde);return (row.waarde!==''&&Number.isFinite(n)?new Intl.NumberFormat('nl-NL',{maximumFractionDigits:2}).format(n):row.waarde)+(row.eenheid?' '+row.eenheid:'');};
+ for(const row of data.entiteiten||[]){const item=document.createElement('div'),name=document.createElement('span'),value=document.createElement('b');name.textContent=row.naam.replace(/^ATAG · Energion · Warmtepomp\s*(Ariston\s*)?/,'');value.textContent=waarde(row);item.append(name,value);sensors.append(item);}
  const sub=$('stroom').querySelector('.kn[data-k="wp"] .sub');if(sub&&data.water?.huidig!=null)sub.textContent='Water '+nf(data.water.huidig,0)+' °C';
 }
 async function laadWarmte(){
