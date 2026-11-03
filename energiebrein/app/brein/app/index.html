@@ -687,6 +687,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
         </div>
         <div class="nu-rechts">
           <div class="sectie"><h2>Apparaten</h2><ul class="rijen" id="rijen"></ul></div>
+          <div class="sectie" id="warmte-sectie"><h2>Warmtepomp &amp; warm water</h2><div id="warmte-kaarten"><p class="note">Temperaturen ophalen…</p></div><details><summary>Alle beschikbare warmtepompgegevens</summary><div class="cijfers" id="warmte-sensoren"></div></details><p class="note" id="warmte-melding" role="status"></p></div>
           <div class="sectie kort"><h2>Kosten</h2><div id="kosten-kort"><p class="klein">Na een dag meten zie je hier wat het je oplevert.</p></div>
             <button class="btn" type="button" data-view="kosten">Kostenoverzicht</button></div>
           <div class="sectie" id="conditie-sectie" hidden><h2>Conditie van de accu</h2><div class="cijfers" id="conditie"></div><p class="note" id="conditie-uitleg"></p></div>
@@ -1148,7 +1149,7 @@ function renderStroom(m,a){
   const soc=Math.max(0,Math.min(100,m.accu_soc));
   for(const k in KNOPEN){if(!zicht[k])continue;const p=st[k],kw=Math.abs(p),actief=kw>=0.05;
     const g=el.querySelector(`.kn[data-k="${k}"]`),v=el.querySelector(`.vloei[data-k="${k}"]`);if(!g||!v)continue;
-    g.classList.toggle('uit',!actief&&k!=='accu');
+    g.classList.toggle('uit',!actief&&k!=='accu'&&!(k==='wp'&&WARMTE?.water?.huidig!=null));
     v.style.display=actief?'':'none';v.classList.toggle('terug',p<0);
     v.style.setProperty('--duur',Math.max(0.7,3-kw*0.4).toFixed(2)+'s');v.style.strokeWidth=(2.2+Math.min(kw,6)*0.35).toFixed(2);
     g.querySelector('.getal').textContent=k==='accu'?nf(soc,0):nf2(kw);
@@ -1156,7 +1157,7 @@ function renderStroom(m,a){
       net:p>=0.05?'van het net':p<=-0.05?'naar het net':'geen uitwisseling',
       accu:p>0.05?`levert ${nf2(kw)} kW`:p<-0.05?`laadt ${nf2(kw)} kW`:'wacht',
       auto:m.auto_verbonden?(actief?'laadt':'aangesloten'):'geen auto',
-      wp:actief?'stookt':'rust'}[k];
+      wp:WARMTE?.water?.huidig!=null?`Water ${nf(WARMTE.water.huidig,0)} °C`:(actief?'stookt':'rust')}[k];
     g.querySelector('.sub').textContent=sub;
     if(k==='accu')g.querySelector('.ring').setAttribute('stroke-dasharray',`${(soc/100*RING).toFixed(1)} ${RING.toFixed(1)}`);}
   // Het huis is alles wat er verbruikt wordt, ook de warmtepomp en de auto (die hangen eraan vast in het schema)
@@ -1885,6 +1886,8 @@ function koppelStatus(){
   else zetStand('laadpaal',[MERKNAAM[l.type]||l.type,l.type==='ocpp'?(K.laadpaal_verbonden?'verbonden':'wacht op de laadpaal'):(l.type==='easee'?'via je Easee-account':l.host),sim?'simulatie':''].filter(Boolean).join(', '),l.type==='ocpp'&&!K.laadpaal_verbonden&&!sim?'half':lampVoor('laadpaal'));
   const w=c.warmtepomp;
   if(!w.type||w.type==='uit')zetStand('warmtepomp','Nog niet gekoppeld');
+  else if(w.type==='ha_thermostaat')zetStand('warmtepomp','Thermostaat · '+(w.thermostaat||'nog kiezen'),lampVoor('warmtepomp'));
+  else if(w.type==='meter')zetStand('warmtepomp','Alleen meten · '+(w.meter||'meter nog kiezen'),lampVoor('warmtepomp'));
   else zetStand('warmtepomp',['SG-ready',w.relais1&&w.relais2?`relais ${w.relais1} en ${w.relais2}`:'relais nog invullen',sim?'simulatie':''].filter(Boolean).join(', '),lampVoor('warmtepomp'));
   const ca=c.auto||{},cs=S&&S.auto&&S.auto.auto;
   if(!ca.merk||ca.merk==='uit')zetStand('auto','Niet gekoppeld (niet verplicht)');
@@ -2100,6 +2103,38 @@ async function laadLeerweek(){
   }catch(e){el.innerHTML=`<p class="note">${esc(e.message||'Niet te laden')}</p>`;}
 }
 setTimeout(laadLeerweek,1500);setInterval(laadLeerweek,600000);
+
+
+// Temperaturen komen van de gekoppelde HA-installatie, niet van geschat vermogen.
+let WARMTE=null, warmteBezig=false;
+const warmteGraden=x=>x==null?'Niet beschikbaar':nf(x,1)+' °C';
+function renderWarmte(data){
+ WARMTE=data;const root=$('warmte-kaarten');root.replaceChildren();
+ for(const [key,title] of [['huis','Huis'],['water','Warm water']]){
+  const d=data[key],box=document.createElement('div');box.className='howto';
+  const heading=document.createElement('b');heading.textContent=title;box.append(heading);
+  const info=document.createElement('p');info.className='feit';info.textContent=d?warmteGraden(d.huidig)+' · ingesteld '+warmteGraden(d.doel):'Niet doorgegeven door deze koppeling';box.append(info);
+  if(d?.instelbaar&&d.min!=null&&d.max!=null){
+   const label=document.createElement('label');label.className='f';label.textContent='Gewenst (°C)';
+   const input=document.createElement('input');input.type='number';input.min=d.min;input.max=d.max;input.step=d.stap;input.value=d.doel??'';input.setAttribute('aria-label',title+' gewenste temperatuur');label.append(input);box.append(label);
+   const button=document.createElement('button');button.className='btn';button.type='button';button.textContent='Instellen';
+   button.onclick=async()=>{if(!input.reportValidity()||input.value==='')return;button.disabled=true;const msg=$('warmte-melding');
+    try{await api('/api/warmtepomp/temperatuur',{deel:key,temperatuur:Number(input.value)});msg.textContent='Opdracht verstuurd. De nieuwe waarde verschijnt na bevestiging door ATAG.';}
+    catch(e){msg.textContent=e.message||'Instellen mislukt';}finally{button.disabled=false;}};
+   box.append(button);
+  }root.append(box);
+ }
+ const sensors=$('warmte-sensoren');sensors.replaceChildren();
+ for(const row of data.entiteiten||[]){const item=document.createElement('div'),name=document.createElement('span'),value=document.createElement('b');name.textContent=row.naam.replace(/^ATAG · Energion · Warmtepomp\s*(Ariston\s*)?/,'');value.textContent=['unknown','unavailable'].includes(row.waarde)?'Niet beschikbaar':row.waarde+(row.eenheid?' '+row.eenheid:'');item.append(name,value);sensors.append(item);}
+ const sub=$('stroom').querySelector('.kn[data-k="wp"] .sub');if(sub&&data.water?.huidig!=null)sub.textContent='Water '+nf(data.water.huidig,0)+' °C';
+}
+async function laadWarmte(){
+ if(warmteBezig||document.activeElement?.closest('#warmte-kaarten'))return;warmteBezig=true;
+ try{const data=await api('/api/warmtepomp');renderWarmte(data);}
+ catch(e){WARMTE=null;$('warmte-kaarten').textContent=e.message||'Temperaturen niet beschikbaar';$('warmte-sensoren').replaceChildren();const sub=$('stroom').querySelector('.kn[data-k="wp"] .sub');if(sub)sub.textContent='Temperatuur onbekend';}
+ finally{warmteBezig=false;}
+}
+setTimeout(laadWarmte,1000);setInterval(laadWarmte,30000);
 
 setInterval(laadPlan,60000);
 </script>
