@@ -83,6 +83,11 @@ laadpaal:
 
 # ---------- Warmtepomp (SG-ready via twee Shelly-relais) ----------
 warmtepomp:
+  thuiskomst: ""  # bijvoorbeeld 16:00; leeg = gemeten avondpiek of hele dag
+  gasloos: false
+  rustig_voorverwarmen: false
+  warmwater_slim: false
+  warmwater_extra_kwh: 1.0  # schatting voor één uur warmwaterbijverwarming
   type: uit               # sgready_shelly, meter, ha_thermostaat of uit
   relais1: 192.168.1.70   # SG-ready contact 1
   relais2: 192.168.1.71   # SG-ready contact 2
