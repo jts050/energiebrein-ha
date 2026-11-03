@@ -1,3 +1,13 @@
+## 1.22.0
+
+- Nederlandse warmtepompnamen, Aan/Uit en getallen met komma; gasregels verbergen bij een gasloze installatie.
+- Optioneel rustig vooruitverwarmen: één aaneengesloten gunstig uur, maximaal +0,5 °C en geen prijsafhankelijke verlaging.
+- Optioneel warm water voorbereiden vóór comforttijden: één gunstig uur, maximaal +2 °C. Alleen met de reeds actieve native warmwaterregeling; bedrijfsmodi en legionellaprogramma blijven behouden.
+- Warmteblokken staan nu met tijden, reden en geschat verbruik in ‘Wat er gaat gebeuren’ en tellen mee in het accuplan.
+- Nieuw avondprofiel uit afzonderlijke, verse warmtepompmetingen: gemiddeld verbruik van 16–24 uur en drukste uur. Na drie complete avonden plant rustig vooruitverwarmen in de vier uur vóór die piek. Meetgaten en driverschattingen tellen niet mee.
+- Instelbare thuiskomsttijd als richtpunt voor rustig vooruitverwarmen. Plan toont modelmatig prijsvoordeel en geschatte extra warmwaterkosten apart; geen onbewezen besparing als gemeten factuurkorting.
+- Eigen temperatuurkeuzes blijven leidend. Nieuwe automatische functies staan standaard uit; stel comforttijden en het geschatte warmwaterverbruik in vóór inschakelen.
+
 ## 1.21.0
 - Gemeten warmwatertemperatuur direct onder de warmtepomp in het stroomschema.
 - Op Thuis: huis- en warmwatertemperatuur, ingestelde waarden en alle beschikbare sensoren van de gekoppelde installatie.
