@@ -17,7 +17,7 @@ def getal(value):
         return None
 
 
-def overzicht(states, thermostaat):
+def overzicht(states, thermostaat, gasloos=False):
     huis, water = entiteiten(thermostaat)
     prefix = huis.split(".", 1)[1]
     rows = {s["entity_id"]: s for s in states}
@@ -45,9 +45,11 @@ def overzicht(states, thermostaat):
             continue
         if object_id != prefix and not object_id.startswith(prefix + "_"):
             continue
+        if gasloos and ("_gas_" in object_id or object_id.endswith("_is_flame_on")):
+            continue
         attrs = state.get("attributes", {})
         result["entiteiten"].append({"entity": entity,
-            "naam": attrs.get("friendly_name", entity), "waarde": state.get("state"),
+            "naam": sensornaam(object_id, prefix, attrs.get("friendly_name", entity)), "waarde": state.get("state"),
             "eenheid": attrs.get("unit_of_measurement", "")})
     return result
 
@@ -65,3 +67,23 @@ def controleer_temperatuur(data, deel, temperatuur):
     if abs((value - lo) / step - round((value - lo) / step)) > 0.00001:
         raise ValueError("Gebruik de temperatuurstappen van de installatie")
     return item["entity"], value
+
+
+SENSORNAMEN = {
+    'is_flame_on': 'Brander actief', 'holiday_mode': 'Vakantiemodus',
+    'heating_circuit_pressure': 'Waterdruk cv', 'ch_flow_setpoint_temp': 'Gewenste cv-aanvoertemperatuur',
+    'ch_flow_temp': 'Cv-aanvoertemperatuur', 'ch_return_temp': 'Cv-retourtemperatuur',
+    'outside_temp': 'Buitentemperatuur', 'signal_strength': 'Signaalsterkte',
+    'electricity_consumption_for_heating_last_month': 'Elektriciteitsverbruik verwarming vorige maand',
+    'electricity_consumption_for_cooling_last_month': 'Elektriciteitsverbruik koeling vorige maand',
+    'electricity_consumption_for_water_last_month': 'Elektriciteitsverbruik warm water vorige maand',
+    'gas_consumption_for_heating_last_month': 'Gasverbruik verwarming vorige maand',
+    'gas_consumption_for_water_last_month': 'Gasverbruik warm water vorige maand',
+    'central_heating_total_energy_consumption': 'Totaal energieverbruik verwarming',
+    'domestic_hot_water_total_energy_consumption': 'Totaal energieverbruik warm water',
+    'errors_count': 'Aantal storingen',
+}
+
+def sensornaam(object_id, prefix, fallback):
+    suffix = object_id.removeprefix(prefix + '_').removeprefix('ariston_')
+    return SENSORNAMEN.get(suffix, fallback)

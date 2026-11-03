@@ -17,6 +17,7 @@ class Meting:
     auto_verbonden: bool = False
     auto_geladen_kwh: float = 0.0   # in deze laadsessie
     wp_kw: float = 0.0
+    wp_gemeten: bool = False
     wp_stand: str = "normaal"    # sg-ready stand
     huis_kw: float = 0.0         # rest van het huis (berekend)
 
@@ -40,6 +41,10 @@ class Kwartier:
     soc_na: float = 0.0          # % na dit kwartier
     net_kwh: float = 0.0         # verwacht
     wp_stand: str = "normaal"    # normaal / boost / wacht
+    water_boost: bool = False
+    water_kwh: float = 0.0
+    water_tot: str = ""
+    water_reden: str = ""
     aftoppen: bool = False
     waarde_kwh: float = 0.0      # wat een opgeslagen kWh later in het plan waard is (€)
     reden: str = ""

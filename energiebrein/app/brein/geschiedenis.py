@@ -8,7 +8,7 @@ from pathlib import Path
 from .model import Meting, KWARTIER_H
 
 VELDEN = ["net_kwh", "zon_kwh", "accu_kwh", "auto_kwh", "wp_kwh", "huis_kwh", "kosten", "kosten_zonder", "soc", "beurs",
-          "afname_kwh", "terug_kwh", "inkoop", "terug", "accu_geladen_kwh"]     # inkoop/terug: de echte prijs van dat kwartier (€/kWh)
+          "afname_kwh", "terug_kwh", "inkoop", "terug", "accu_geladen_kwh", "wp_meetseconden", "wp_gemeten_kwh"]     # inkoop/terug: de echte prijs van dat kwartier (€/kWh)
 
 
 class Geschiedenis:
@@ -62,6 +62,9 @@ class Geschiedenis:
         r["accu_geladen_kwh"] += max(m.accu_kw, 0.0) * h
         r["auto_kwh"] += m.auto_kw * h
         r["wp_kwh"] += m.wp_kw * h
+        if m.wp_gemeten:
+            r["wp_meetseconden"] += interval_s
+            r["wp_gemeten_kwh"] += m.wp_kw * h
         r["huis_kwh"] += m.huis_kw * h
         r["kosten"] += net * (inkoop if net > 0 else teruglever)
         r["kosten_zonder"] += zonder * (inkoop if zonder > 0 else teruglever)

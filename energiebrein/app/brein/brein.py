@@ -152,6 +152,8 @@ class Brein:
         self.planner.storm = self.stormkwartieren(kw)
         self.planner.onzekerheid = self.voorsp.planner_onzekerheid()
         self.planner.rendement = self.rendement()
+        from .warmteplan import avondprofiel
+        self.planner.avondprofiel = avondprofiel(self.gesch.rijen(datetime.now(timezone.utc) - timedelta(days=7)))
         self.plan = self.planner.maak(kw, m.accu_soc if m else 50.0, self.bed, auto, self.voorsp.wp_dag_kwh)
         if getattr(self, "_auto_net_aan", False):
             self._auto_net_aan = False
@@ -626,6 +628,9 @@ class Brein:
             await self.huis.warmtepomp(stand)
             b["warmtepomp"] = {"boost": "Stookt extra op goedkope stroom", "wacht": "Wacht even, stroom is duur",
                                "normaal": "Normaal"}[stand]
+        water_tot = k.water_tot if (k and k.water_boost and self.bed.warmtepomp == "auto"
+                    and self.cfg["warmtepomp"].get("warmwater_slim")) else None
+        await self.huis.warmwater(water_tot)
         if self.huis.vergrendeld:
             for sleutel in ("accu", "zon", "laadpaal", "warmtepomp"):
                 if sleutel in b and not b[sleutel].startswith("Advies") and b[sleutel] not in ("Normaal", "Niet aangesloten", "Geen auto aangesloten"):

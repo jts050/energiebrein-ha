@@ -64,8 +64,12 @@ class Planner:
         self.rendement: float | None = None    # rendement heen en terug waarmee gerekend wordt; leeg = wat je instelde (zie Conditie)
         self.reserve_pct = 0.0
         self.reserve_info: dict = {}
+        self.avondprofiel = {}
+        self._water_keuzes = {}
+        self._rustig_keuzes = {}
         self._e_start = 0.0
         self._eindwaarde = 0.0
+        self.warmtevoordeel = {}
 
     def _eta(self) -> float:
         """Rendement per kant (laden of leveren): de wortel van het rendement heen en terug."""
@@ -82,6 +86,12 @@ class Planner:
             return {"kwartieren": [], "samenvatting": {}}
         self._reserve(kw)
         self._warmtepomp(kw, bed, wp_dag_kwh)
+        from .warmteplan import plan_warmwater, prijsvoordeel
+        self.warmtevoordeel = prijsvoordeel(kw, wp_dag_kwh, self.cfg.get('warmtepomp', {}))
+        if bed.warmtepomp == "auto":
+            plan_warmwater(kw, self.cfg.get("warmtepomp", {}), self._water_keuzes)
+        self.warmtevoordeel['warmwater_extra_kosten'] = sum(
+            k.water_kwh * self._marginaal(k) for k in kw)
         self._auto(kw, bed, auto)
         self._accu(kw, soc_nu)
         return {"kwartieren": kw, "samenvatting": self._samenvatting(kw, soc_nu)}
@@ -165,6 +175,29 @@ class Planner:
             if alleen_meten:
                 pass
             elif bed.warmtepomp == "auto":
+                if c.get("rustig_voorverwarmen") and c.get("type") == "ha_thermostaat":
+                    from .warmteplan import goedkoop_blok
+                    # Eén rustig uur, geen prijsafhankelijke verlaging van de kamer.
+                    if dag not in self._rustig_keuzes:
+                        kandidaten = ks
+                        piek = self.avondprofiel.get("piek_uur")
+                        deadline_min = piek * 60 if self.avondprofiel.get("voldoende") and piek is not None else None
+                        aankomst = c.get('thuiskomst', '')
+                        if aankomst:
+                            try:
+                                h, m = map(int, aankomst.split(':'))
+                                if 0 <= h < 24 and 0 <= m < 60:
+                                    deadline_min = h * 60 + m
+                            except (ValueError, TypeError):
+                                pass
+                        if deadline_min is not None:
+                            kandidaten = [k for k in ks if (deadline_min -
+                                (k.start.astimezone().hour * 60 + k.start.astimezone().minute)) % 1440 in range(15, 241)]
+                        self._rustig_keuzes[dag] = {k.start for k in goedkoop_blok(kandidaten)}
+                    for k in ks:
+                        if k.start in self._rustig_keuzes[dag]:
+                            stand[id(k)] = "boost"
+                    nb = nw = 0
                 volgorde = sorted(ks, key=self._marginaal)
                 for k in volgorde[:nb]:
                     stand[id(k)] = "boost"
@@ -175,7 +208,7 @@ class Planner:
             # Boost = zo'n 2,5x het gemiddelde (warmer stoken of boiler opwarmen), wacht = even niets.
             # Het dagtotaal blijft gelijk: wat eerder gestookt wordt, hoeft later niet meer.
             gem = totaal / len(ks)
-            boost = min(p, gem * 2.5)
+            boost = min(p, gem * 2.5, totaal / max(sum(s == 'boost' for s in stand.values()), 1))
             vast = boost * sum(1 for k in ks if stand[id(k)] == "boost")
             normaal = [k for k in ks if stand[id(k)] == "normaal"]
             rest = max(totaal - vast, 0) / max(len(normaal), 1)

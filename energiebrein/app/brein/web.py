@@ -36,7 +36,7 @@ INSTELBAAR = {
     "zonnepanelen": None,
     "accu": ["capaciteit_kwh", "max_laden_kw", "max_ontladen_kw", "min_soc", "max_soc", "min_winst_per_kwh", "terugverkopen", "zon_altijd_in_accu", "stormstand", "onzekerheidsreserve", "slijtage_per_kwh"],
     "laadpaal": ["type", "host", "fasen", "max_stroom_a", "auto_accu_kwh", "gebruiker", "wachtwoord", "serienummer"],
-    "warmtepomp": ["type", "relais1", "relais2", "meter", "thermostaat", "verhoging", "verlaging", "vermogen_kw", "jaarverbruik_kwh", "blokkeer_uren_per_dag", "max_wacht_achter_elkaar_uur", "niet_wachten_onder_c", "comfort_tijden"],
+    "warmtepomp": ["type", "relais1", "relais2", "meter", "thermostaat", "gasloos", "rustig_voorverwarmen", "warmwater_slim", "warmwater_extra_kwh", "thuiskomst", "verhoging", "verlaging", "vermogen_kw", "jaarverbruik_kwh", "blokkeer_uren_per_dag", "max_wacht_achter_elkaar_uur", "niet_wachten_onder_c", "comfort_tijden"],
     "huis": ["jaarverbruik_kwh"],
     "auto": ["merk", "gebruiker", "wachtwoord", "spin", "vin"],
     "meldingen": ["telefoon", "bij_opgelost"],
@@ -126,7 +126,7 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
                 async with session.get(f"{telefoon.HA}/states", headers=telefoon._kop()) as response:
                     response.raise_for_status()
-                    return warmte.overzicht(await response.json(), entity)
+                    return warmte.overzicht(await response.json(), entity, staat["cfg"].get("warmtepomp", {}).get("gasloos", False))
         except ValueError as error:
             raise HTTPException(400, str(error)) from error
         except Exception as error:
@@ -159,7 +159,12 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
 
     @app.get("/api/plan")
     async def plan():
-        return {"kwartieren": [k.dict() for k in B().plan["kwartieren"]], "samenvatting": B().plan["samenvatting"]}
+        from .warmteplan import warmteblokken
+        return {"kwartieren": [k.dict() for k in B().plan["kwartieren"]], "samenvatting": B().plan["samenvatting"],
+                "warmteblokken": warmteblokken(B().plan["kwartieren"], staat["cfg"].get("warmtepomp", {})),
+                "warmteprofiel": B().planner.avondprofiel,
+                "warmtevoordeel": B().planner.warmtevoordeel,
+                "warmte_thuiskomst": staat["cfg"].get("warmtepomp", {}).get("thuiskomst", "")}
 
     @app.get("/api/geschiedenis")
     async def geschiedenis(uren: int = 24):
