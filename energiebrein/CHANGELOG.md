@@ -1,3 +1,11 @@
+## 1.21.0
+- Gemeten warmwatertemperatuur direct onder de warmtepomp in het stroomschema.
+- Op Thuis: huis- en warmwatertemperatuur, ingestelde waarden en alle beschikbare sensoren van de gekoppelde installatie.
+- Huis en warm water handmatig instellen binnen de grenzen en stappen die Home Assistant meldt. Alleen de ingestelde installatie is bereikbaar; geen vrije service-opdrachten.
+- Onbekende of niet bereikbare temperaturen worden expliciet als niet beschikbaar getoond.
+- Thermostaatkoppeling krijgt geen misleidend SG-ready-opschrift meer.
+- Automatische warmwaterregeling en legionellaprogramma's blijven ongewijzigd.
+
 # Wat er nieuw is
 
 ## 1.20.0
