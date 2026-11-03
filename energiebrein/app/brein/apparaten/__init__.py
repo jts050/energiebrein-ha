@@ -170,6 +170,7 @@ class Huis:
                     continue
                 oud = (nu - vorige[0]).total_seconds() > TOLERANTIE_S
                 waarden = {k: v for k, v in vorige[1].items() if not oud or k == "accu_soc"}
+                waarden.pop("wp_gemeten", None)  # hergebruikte waarde is geen nieuwe meting
             for k, v in waarden.items():
                 if naam == "omvormer" and k == "net_kw" and self.p1:
                     continue  # P1-meter is leidend voor het net
@@ -195,6 +196,7 @@ class Huis:
             if self.laadpaal:
                 await self.laadstroom(self.cfg["laadpaal"].get("max_stroom_a", 16))
             await self.warmtepomp("normaal")
+            await self.warmwater(None)
         finally:
             self.vergrendeld = slot
 
@@ -221,6 +223,10 @@ class Huis:
 
     async def laadstroom(self, a):
         await self._doe("laadpaal", self.sim or self.laadpaal, "laadstroom", a)
+
+    async def warmwater(self, tot=None):
+        if self.wp and hasattr(self.wp, "warmwater") and not self.sim:
+            await self._doe("warmwater", self.wp, "warmwater", tot)
 
     async def warmtepomp(self, stand):
         await self._doe("warmtepomp", self.sim or self.wp, "warmtepomp", stand)

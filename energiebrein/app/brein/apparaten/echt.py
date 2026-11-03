@@ -526,7 +526,7 @@ class SGReadyShelly:
         meter = (self.cfg.get("meter") or "").strip()
         if meter:
             kw = await shelly_vermogen_kw(meter)
-            return {"wp_kw": kw, "wp_stand": self.stand}
+            return {"wp_kw": kw, "wp_stand": self.stand, "wp_gemeten": True}
         # Zonder eigen meter schatten we het vermogen uit de stand
         p = self.cfg["vermogen_kw"]
         return {"wp_kw": {"boost": p, "wacht": 0.0}.get(self.stand, p * 0.35), "wp_stand": self.stand}
@@ -545,6 +545,8 @@ class HAThermostaat:
         self._laatste = None
         self.basis: float | None = None             # jouw eigen ingestelde temperatuur, zolang het brein hem verschoven heeft
         self.gezet: float | None = None             # wat het brein er zelf van gemaakt heeft
+        from ..warmwater import WarmwaterRegelaar
+        self.water = WarmwaterRegelaar(self.cfg.get("thermostaat", ""), bewaar.with_name("wp_warmwater.json") if bewaar else None)
         self._pad = bewaar
         try:
             if bewaar and bewaar.exists():
@@ -601,11 +603,20 @@ class HAThermostaat:
             await self.warmtepomp("normaal")
         except Exception as e:
             log.warning("Thermostaat terugzetten mislukt: %s", e)
+        await self.water.regel(None)
+
+    async def warmwater(self, tot=None):
+        await self.water.regel(tot)
 
     async def warmtepomp(self, stand: str):
+        if self.cfg.get("rustig_voorverwarmen") and stand == "wacht":
+            stand = "normaal"
         if stand == self._laatste:
             return
         t = await self._toestand()
+        if stand != "normaal" and (t.get("state") not in ("heat", "auto")
+                                  or (t.get("attributes") or {}).get("hvac_action") == "cooling"):
+            return  # geen uitgeschakelde verwarming of koeling overrulen
         huidig = (t.get("attributes") or {}).get("temperature")
         huidig = float(huidig) if huidig is not None else None
         if stand == "normaal":
@@ -622,6 +633,10 @@ class HAThermostaat:
             elif huidig is not None and self.gezet is not None and abs(huidig - self.gezet) >= 0.01:
                 self.basis = huidig                         # je veranderde de temperatuur zelf: reken vanaf jouw nieuwe waarde
             delta = {"boost": float(self.cfg.get("verhoging", 1.0)), "wacht": -float(self.cfg.get("verlaging", 1.0))}.get(stand, 0.0)
+            if self.cfg.get("rustig_voorverwarmen"):
+                import math
+                stap = float((t.get("attributes") or {}).get("target_temp_step") or .5)
+                delta = math.floor(max(0.0, min(delta, 0.5)) / stap) * stap
             self.gezet = await self._zet(self.basis + delta, t)
             self._bewaar()
         self._laatste = self.stand = stand
@@ -630,7 +645,7 @@ class HAThermostaat:
     async def lees(self) -> dict:
         meter = (self.cfg.get("meter") or "").strip()
         if meter:
-            return {"wp_kw": await shelly_vermogen_kw(meter), "wp_stand": self.stand}
+            return {"wp_kw": await shelly_vermogen_kw(meter), "wp_stand": self.stand, "wp_gemeten": True}
         p = self.cfg["vermogen_kw"]
         return {"wp_kw": {"boost": p, "wacht": 0.0}.get(self.stand, p * 0.35), "wp_stand": self.stand}
 
@@ -656,7 +671,7 @@ class WPMeter:
         meter = (self.cfg.get("meter") or "").strip()
         if not meter:
             raise RuntimeError("vul het IP-adres van de energiemeter van de warmtepomp in")
-        return {"wp_kw": await shelly_vermogen_kw(meter), "wp_stand": "normaal"}
+        return {"wp_kw": await shelly_vermogen_kw(meter), "wp_stand": "normaal", "wp_gemeten": True}
 
 
 async def shelly_vermogen_kw(host: str) -> float:
