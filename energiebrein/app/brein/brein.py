@@ -552,12 +552,16 @@ class Brein:
                 verkopen = mag_verkopen(a)
                 if not verkopen or (terug * rendement - drempel < goedkoopst and not raakt_vol):
                     plan_terug = 0.0
+                eigen_grens = self.planner.verkoopruimte_kw(k, m.accu_soc, vraag_nu)
+                plan_terug = min(plan_terug, eigen_grens)
                 kw = min(a["max_ontladen_kw"], vraag_nu + plan_terug)
-                kw = max(round(kw / 0.4) * 0.4, 0.4)            # in stapjes van 0,4 kW, zodat de omvormer niet elke 10 s een nieuwe opdracht krijgt
+                kw = (math.floor(kw / 0.4) * 0.4 if a.get("eigen_huis_eerst", False)
+                      else max(round(kw / 0.4) * 0.4, 0.4))            # in stapjes van 0,4 kW, zodat de omvormer niet elke 10 s een nieuwe opdracht krijgt
                 if plan_terug == 0.0:
                     await self._eigen(m)
                     b["accu"] = "Voedt het huis"
-                    reden = ("Terugverkopen aan het net staat uit; de accu voedt alleen je eigen huis." if not verkopen else
+                    reden = ("Bewaart lading voor eigen verbruik en warmtepomp; geen verkoop uit de eigen reserve." if eigen_grens <= 0 else
+                             "Terugverkopen aan het net staat uit; de accu voedt alleen je eigen huis." if not verkopen else
                              f"Terugverkopen voor {self._e(terug)} levert na laadverlies en slijtage te weinig op tegenover later "
                              f"weer inkopen (vanaf {self._e(goedkoopst)}).")
                 elif kw <= vraag_nu + 0.05:

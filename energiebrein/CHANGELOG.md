@@ -1,3 +1,11 @@
+## 1.23.0
+
+- Optioneel eerst eigen voorraad bewaren: alleen verkopen boven de conservatieve verwachte behoefte van de komende 24 uur. Houdt rekening met huis, warmtepomp, geplande auto, minder zon, vraagmarge en accuverliezen.
+- Verkoopreserve is geen ontlaadondergrens: eigen verbruik mag deze lading gebruiken. De ingestelde en hardware-ondergrens blijven leidend.
+- Live verkoop wordt begrensd met actuele acculading en actuele huisvraag. Geen verkoop als een bijpassende reserveberekening ontbreekt.
+- Verwachte reserve en verkoopgrens zichtbaar bij Bediening. Buiten bekende voorspellingen: gemiddeld verbruik en geen veronderstelde zon; geen garantie op zelfvoorziening of besparing.
+- Staat standaard uit voor bestaande installaties; inschakelen via Koppelen → Omvormer en thuisaccu.
+
 ## 1.22.0
 
 - Nederlandse warmtepompnamen, Aan/Uit en getallen met komma; gasregels verbergen bij een gasloze installatie.

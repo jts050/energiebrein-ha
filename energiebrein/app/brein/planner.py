@@ -64,6 +64,8 @@ class Planner:
         self.rendement: float | None = None    # rendement heen en terug waarmee gerekend wordt; leeg = wat je instelde (zie Conditie)
         self.reserve_pct = 0.0
         self.reserve_info: dict = {}
+        self.verkoopreserves = {}
+        self.eigen_reserve_info = {}
         self.avondprofiel = {}
         self._water_keuzes = {}
         self._rustig_keuzes = {}
@@ -93,6 +95,7 @@ class Planner:
         self.warmtevoordeel['warmwater_extra_kosten'] = sum(
             k.water_kwh * self._marginaal(k) for k in kw)
         self._auto(kw, bed, auto)
+        self._verkoopreserve(kw)
         self._accu(kw, soc_nu)
         return {"kwartieren": kw, "samenvatting": self._samenvatting(kw, soc_nu)}
 
@@ -115,6 +118,61 @@ class Planner:
         self.reserve_info = {"actief": extra > .05, "ondergrens_pct": round(self.reserve_pct, 1),
                              "extra_pct": round(extra, 1), "uren": 4,
                              "reden": "Extra lading voor tegenvallende zon of hoger huisverbruik; maximaal 10 procentpunt."}
+
+    def _verkoopreserve(self, kw):
+        """Voorraad voor eigen verbruik, alleen beschermd tegen verkoop; geen ontlaadondergrens.
+
+        Neem het grootste cumulatieve tekort in de volgende 24 uur. Toekomstige zon
+        mag eerdere tekorten niet wegstrepen. Buiten de bekende horizon rekenen we
+        met het recente gemiddelde verbruik en zonder onzekere zon of autolading.
+        """
+        self.verkoopreserves = {}
+        self.eigen_reserve_info = {"actief": False}
+        if not self.cfg['accu'].get('eigen_huis_eerst', False) or not kw:
+            return
+        c = self.cfg['accu']
+        cap = float(c['capaciteit_kwh'])
+        ruimte = max(0.0, cap * (float(c['max_soc']) - self.ondergrens_pct()) / 100)
+        eta = self._eta()
+        # Minimaal 20% vraagmarge; gemeten fouten vergroten deze tot maximaal 100%.
+        huisfout = min(1.0, max(.2, float(self.onzekerheid.get('huis') or .2)))
+        zonfout = min(1.0, max(.2, float(self.onzekerheid.get('zon') or .2)))
+        staart = sum(max(0.0, k.huis_kwh + k.wp_kwh) for k in kw[-16:]) / min(16, len(kw))
+        for t, huidig in enumerate(kw):
+            tekort = piek = 0.0
+            for offset in range(1, 97):
+                j = t + offset
+                if j < len(kw):
+                    k = kw[j]
+                    vraag = max(0.0, k.huis_kwh + k.wp_kwh) * (1 + huisfout) + max(0.0, k.auto_kwh)
+                    zon = max(0.0, k.zon_kwh) * (1 - zonfout)
+                    # Eerst verliezen bij opladen, daarna verliezen bij ontladen.
+                    saldo = (vraag - zon) / eta if vraag >= zon else (vraag - zon) * eta
+                else:
+                    saldo = staart * (1 + huisfout) / eta
+                tekort += saldo
+                piek = max(piek, tekort)
+            self.verkoopreserves[huidig.start] = min(ruimte, piek)
+        eerste = self.verkoopreserves[kw[0].start]
+        self.eigen_reserve_info = {"actief": True, "uren": 24,
+            "kwh": round(eerste, 2), "vraagmarge_pct": round(huisfout * 100),
+            "tot_pct": round(self.ondergrens_pct() + eerste / cap * 100, 1),
+            "reden": "Bewaard voor huis, warmtepomp en geplande auto; wel beschikbaar voor eigen verbruik, niet voor verkoop. Geen noodstroomgarantie."}
+
+    def verkoopruimte_kw(self, k, soc, vraag_kw):
+        """Live bovengrens voor extra netverkoop, boven huidig eigen verbruik.
+
+        Reserveer voorzichtig een heel kwartier huidig verbruik. Zo kan een hogere
+        actuele vraag of lagere actuele lading de verkoop direct begrenzen.
+        """
+        if not self.cfg['accu'].get('eigen_huis_eerst', False):
+            return float('inf')
+        # Ontbrekend/verouderd plan: nooit zonder reserve verkopen.
+        if k.start not in self.verkoopreserves:
+            return 0.0
+        cap = float(self.cfg['accu']['capaciteit_kwh'])
+        vrij = cap * max(0.0, soc - self.ondergrens_pct()) / 100 - self.verkoopreserves[k.start]
+        return max(0.0, vrij * self._eta() / Q - max(0.0, vraag_kw))
 
     def _scenarios(self, k: Kwartier, t: int) -> list[tuple[float, float]]:
         """(kans, afwijking in netverbruik in kWh) per uitkomst. Hoe verder vooruit, hoe onzekerder; het eerstvolgende uur is
@@ -367,6 +425,11 @@ class Planner:
             reserve = (cap * self.reserve_pct / 100 - lo) / stap
             # Onder de reserve mag laden/rusten wel; ontladen niet. Geen fictieve startlading.
             geldig &= ~((deltas < 0)[None, :] & (doel < reserve - 1e-9))
+            if c.get('eigen_huis_eerst', False):
+                eigen = self.verkoopreserves.get(k.start, hi - lo)
+                # Alleen de exportkeuzes begrenzen. Het huis mag de reserve opmaken.
+                export = (d < 0) & (g < min(netto, 0.0) - 1e-9)
+                geldig &= ~(export[None, :] & (doel * stap < eigen - 1e-9))
             if not verkopen:
                 # niet terugverkopen: ontladen mag alleen zolang het de vraag van het huis dekt, nooit naar het net
                 geldig &= ~((d < 0) & (g < min(netto, 0.0) - 1e-9))[None, :]
@@ -429,6 +492,8 @@ class Planner:
                            + (", het duurste moment van het komende etmaal." if duurste else "; dat levert nu meer op dan de lading bewaren."))
             elif k.accu_actie == "ontladen":
                 k.reden = f"Accu voedt het huis, inkoop zou {_euro(k.inkoop)} kosten."
+            elif self.cfg['accu'].get('eigen_huis_eerst', False) and k.accu_actie == 'rust' and k.soc_na > self.ondergrens_pct() + 1:
+                k.reden = "Bewaart lading voor het eigen huis en de warmtepomp; alleen verwacht overschot mag naar het net."
             elif k.inkoop >= hoog and k.soc_na <= self.ondergrens_pct() + 1:
                 k.reden = f"Dure periode ({_euro(k.inkoop)}), maar de accu is leeg (op de ondergrens): het huis haalt stroom uit het net."
             elif k.inkoop >= hoog:
@@ -452,7 +517,7 @@ class Planner:
         voorraad = kw[-1].soc_na / 100 * self.cfg["accu"]["capaciteit_kwh"] - self._e_start
         return {"kosten_plan": round(met, 2), "kosten_zonder_accu": round(zonder, 2),
                 "besparing": round(zonder - met + voorraad * self._eindwaarde, 2), "voorraad_kwh": round(voorraad, 1),
-                "reserve": self.reserve_info,
+                "reserve": self.reserve_info, "eigen_reserve": self.eigen_reserve_info,
                 "kwartieren": len(kw),
                 "tot": (kw[-1].start + timedelta(minutes=15)).isoformat(),
                 "goedkoopste": min(kw, key=lambda k: k.inkoop).start.isoformat(),

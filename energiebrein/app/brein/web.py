@@ -34,7 +34,7 @@ INSTELBAAR = {
     "net": ["max_afname_kw", "p1"],
     "omvormer": ["vermogen_kw", "type", "host", "modbus_poort", "modbus_unit", "aftoppen_bij_negatieve_prijs", "meter_meet", "regel", "sturen", "gebruiker", "wachtwoord", "serienummer", "accu_omkeren"],
     "zonnepanelen": None,
-    "accu": ["capaciteit_kwh", "max_laden_kw", "max_ontladen_kw", "min_soc", "max_soc", "min_winst_per_kwh", "terugverkopen", "zon_altijd_in_accu", "stormstand", "onzekerheidsreserve", "slijtage_per_kwh"],
+    "accu": ["capaciteit_kwh", "max_laden_kw", "max_ontladen_kw", "min_soc", "max_soc", "min_winst_per_kwh", "terugverkopen", "zon_altijd_in_accu", "stormstand", "onzekerheidsreserve", "slijtage_per_kwh", "eigen_huis_eerst"],
     "laadpaal": ["type", "host", "fasen", "max_stroom_a", "auto_accu_kwh", "gebruiker", "wachtwoord", "serienummer"],
     "warmtepomp": ["type", "relais1", "relais2", "meter", "thermostaat", "gasloos", "rustig_voorverwarmen", "warmwater_slim", "warmwater_extra_kwh", "thuiskomst", "verhoging", "verlaging", "vermogen_kw", "jaarverbruik_kwh", "blokkeer_uren_per_dag", "max_wacht_achter_elkaar_uur", "niet_wachten_onder_c", "comfort_tijden"],
     "huis": ["jaarverbruik_kwh"],
@@ -493,6 +493,7 @@ def maak_app(cfg: dict, na_start=None, config_pad: Path | None = None) -> FastAP
             slijtage = float(cfg["accu"].get("slijtage_per_kwh", .02))
             assert math.isfinite(slijtage) and 0 <= slijtage <= 1
             assert isinstance(cfg["accu"].get("onzekerheidsreserve", False), bool)
+            assert isinstance(cfg["accu"].get("eigen_huis_eerst", False), bool)
         except (TypeError, ValueError, AssertionError):
             raise HTTPException(400, "Slijtage moet tussen € 0 en € 1 per geladen kWh liggen; reserve moet aan of uit zijn.")
         from .apparaten import dubbel_gebruik
