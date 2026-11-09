@@ -1,3 +1,8 @@
+## 1.24.0
+
+- **Minder valse meldingen over de omvormer.** Wisselt de GoodWe van stand (bijvoorbeeld aan het begin van de avondpiek van eigen verbruik naar een ontlaadschema), dan heeft hij soms een paar minuten nodig om een nieuwe opdracht over te nemen. Je kreeg daar een "Accu doet iets anders dan Energiebrein vraagt" voor, ook als het zichzelf even later oploste. Nu komt die melding pas als de omvormer minstens 5 minuten op de verkeerde stand blijft staan; het brein blijft de opdracht intussen opnieuw sturen. Een andere EMS-modus (iets van een andere partij) wordt nog steeds meteen gemeld.
+- **Het logboek laat zien wie de omvormer omzette.** Elke wisseling van werkmodus of EMS-modus staat nu in het Logboek ("Omvormer: werkmodus GENERAL → ECO_DISCHARGE"), met erbij of Energiebrein het zelf vroeg of dat het een andere partij was (SolarGo, SEMS of een automatisering in Home Assistant). Zo weet je bij een melding meteen waar het vandaan komt.
+
 ## 1.23.0
 
 - Optioneel eerst eigen voorraad bewaren: alleen verkopen boven de conservatieve verwachte behoefte van de komende 24 uur. Houdt rekening met huis, warmtepomp, geplande auto, minder zon, vraagmarge en accuverliezen.

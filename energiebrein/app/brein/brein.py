@@ -39,6 +39,8 @@ class Brein:
         from .klemtest import KlemTest
         self.klemtest = KlemTest(self)
         self.huis.logboek = self.logboek
+        if getattr(self.huis, "omvormer", None) is not None:
+            self.huis.omvormer.logboek = self.logboek
         self._storingen_vorig: dict | None = None
         from .telefoon import Telefoon
         self.telefoon = Telefoon(cfg)

@@ -65,6 +65,7 @@ class GoodWeNietBereikbaar(RuntimeError):
 
 
 EIGEN_VERBRUIK = {"GENERAL", "SELF_USE"}
+AFWIJKING_NA = timedelta(minutes=5)          # zo lang moet de omvormer op een andere stand blijven staan voor er een melding komt
 
 
 class GoodWe:
@@ -80,6 +81,11 @@ class GoodWe:
         self._laatste_export = "onbekend"
         self.stand: dict = {}
         self.afwijking: str | None = None
+        self.logboek = None                          # wordt door het brein gezet: standwisselingen komen daar in te staan
+        self.wisselingen: list[dict] = []            # de laatste wisselingen van werkmodus of EMS-modus, met wie het deed
+        self._afw_sleutel = None                     # welke afwijking we zien en sinds wanneer; pas na een paar minuten melden
+        self._afw_sinds = None
+        self._gestuurd = None                        # (werkmodus, tijd) van de laatste opdracht van Energiebrein
         self._standby_kan: bool | None = None     # None = nog niet geprobeerd
         self._standby_actief = False
         self.meter_kw: float | None = None
@@ -219,10 +225,12 @@ class GoodWe:
         # lukt het uitlezen van de ondergrens een keer niet, dan de laatst bekende houden (anders springt het plan heen en weer)
         if "ondergrens_pct" not in nieuw and "ondergrens_pct" in self.stand:
             nieuw["ondergrens_pct"] = self.stand["ondergrens_pct"]
-        self.stand = nieuw
+        oud, self.stand = self.stand, nieuw
+        self._noteer_wisselingen(oud, nieuw, nu)
         verwacht = self._laatste_opdracht[0].name if self._laatste_opdracht else None
         wm, ems = self.stand.get("werkmodus"), self.stand.get("ems")
         self.afwijking = None
+        wijkt_af = False
         if ems == "BATTERY_STANDBY" and not getattr(self, "_vraag_vasthouden", False):
             # De accu staat in stand-by terwijl Energiebrein dat nu niet vraagt (bijvoorbeeld blijven hangen van eerder).
             # Energiebrein regelt de accu, dus terug naar automatisch. Komt hij steeds terug, dan zet iemand anders hem zo.
@@ -242,11 +250,46 @@ class GoodWe:
         elif verwacht and wm and wm != verwacht and not wm.startswith("niet") and not (verwacht in EIGEN_VERBRUIK and wm in EIGEN_VERBRUIK):
             wm = {"ECO": "TOU-modus (tijdschema)", "ECO_CHARGE": "TOU-modus met laadschema", "ECO_DISCHARGE": "TOU-modus met ontlaadschema"}.get(wm, wm)
             verwacht = "eigen verbruik" if verwacht in EIGEN_VERBRUIK else verwacht
-            self.afwijking = (f"Energiebrein vroeg {verwacht}, maar de omvormer staat op {wm}. De opdracht is niet aangekomen of wordt "
-                              "overschreven door een andere partij (energieleverancier, GoodWe-cloud of SolarGo-app).")
+            wijkt_af = True
+            sleutel = (verwacht, wm)
+            if self._afw_sleutel != sleutel:
+                self._afw_sleutel, self._afw_sinds = sleutel, nu
+            # De omvormer heeft soms een paar minuten nodig om een nieuwe stand over te nemen. Pas melden als het blijft, anders
+            # krijg je bij elke gewone overgang (bijvoorbeeld aan het begin van de avondpiek) een melding die zichzelf oplost.
+            if nu - self._afw_sinds >= AFWIJKING_NA:
+                self.afwijking = (f"Energiebrein vroeg {verwacht}, maar de omvormer staat op {wm}, al {int((nu - self._afw_sinds).total_seconds() // 60)} minuten. "
+                                  "De opdracht is niet aangekomen of wordt overschreven door een andere partij (energieleverancier, "
+                                  "GoodWe-cloud, SolarGo-app of een automatisering in Home Assistant).")
             self._laatste_opdracht = None      # volgende ronde opnieuw sturen
+        if not wijkt_af:
+            self._afw_sleutel = self._afw_sinds = None
         if self.afwijking:
             log.warning("GoodWe: %s (stand: %s)", self.afwijking, self.stand)
+
+    def _noteer_wisselingen(self, oud: dict, nieuw: dict, nu: datetime) -> None:
+        """Elke verandering van werkmodus of EMS-modus in het logboek, met erbij of Energiebrein het zelf vroeg.
+        Zo zie je bij een melding meteen of het brein de omvormer omzette of iemand anders."""
+        if not oud:
+            return
+        gestuurd = self._gestuurd
+        recent = bool(gestuurd) and (nu - gestuurd[1]).total_seconds() < 600
+        for veld, naam in (("werkmodus", "werkmodus"), ("ems", "EMS-modus")):
+            a, b = oud.get(veld), nieuw.get(veld)
+            if a is None or b is None or a == b:
+                continue
+            if veld == "werkmodus" and a in EIGEN_VERBRUIK and b in EIGEN_VERBRUIK:
+                continue                                           # GENERAL en SELF_USE zijn hetzelfde voor ons
+            if veld == "werkmodus":
+                zelf = recent and (b == gestuurd[0] or (b in EIGEN_VERBRUIK and gestuurd[0] in EIGEN_VERBRUIK))
+            else:
+                zelf = "BATTERY_STANDBY" in (a, b) and (getattr(self, "_vraag_vasthouden", False) or getattr(self, "_standby_actief", False)
+                                                      or (nu - getattr(self, "_ems_herstel", datetime.min.replace(tzinfo=timezone.utc))).total_seconds() < 600)
+            tekst = (f"Omvormer: {naam} {a} → {b} " +
+                     ("(door Energiebrein gevraagd)" if zelf else "(niet door Energiebrein gevraagd: SolarGo, SEMS of Home Assistant?)"))
+            self.wisselingen = (self.wisselingen + [{"tijd": nu.isoformat(timespec="seconds"), "tekst": tekst, "zelf": zelf}])[-30:]
+            log.info("GoodWe: %s", tekst)
+            if self.logboek:
+                self.logboek.schrijf("systeem", tekst, "omvormer")
 
     async def zet_ondergrens(self, pct: int) -> int:
         """Ontlaaddiepte (DoD op het net) aanpassen, alleen na een klik van de gebruiker. Nooit onder 10%:
@@ -298,6 +341,7 @@ class GoodWe:
             opdracht = (self._eigen_verbruik(), 100, 100)
         if opdracht != self._laatste_opdracht:
             self._opdracht_tijd = datetime.now(timezone.utc)
+            self._gestuurd = (opdracht[0].name, self._opdracht_tijd)
             await self.inv.set_operation_mode(*opdracht)
             log.info("GoodWe: %s %s%% doel %s%%", opdracht[0].name, opdracht[1], opdracht[2])
             if opdracht[0].name in EIGEN_VERBRUIK:
