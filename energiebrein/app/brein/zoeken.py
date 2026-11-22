@@ -295,6 +295,7 @@ async def test(soort: str, ip: str, extra: dict | None = None) -> dict:
             g.inv = inv
             st = await g.lees_stand()
             extra_tekst = f", werkmodus {st.get('werkmodus')}" + (f", EMS-modus {st['ems']}" if st.get("ems") else "")
+
             if st.get("ondergrens_pct") is not None:
                 extra_tekst += f", ontlaadt tot {st['ondergrens_pct']}%"
             # gegevens van de accu zelf (BMS): waarom levert hij wel of niet
@@ -318,7 +319,10 @@ async def test(soort: str, ip: str, extra: dict | None = None) -> dict:
             meter = d.get("meter_active_power_total", d.get("active_power"))
             if meter is not None:
                 extra_tekst += f", eigen meter ziet {-float(meter) / 1000:.1f} kW {'afname' if float(meter) <= 0 else 'teruglevering'}"
-            return {"ok": True, "tekst": f"{inv.model_name}: zon {(d.get('ppv') or 0) / 1000:.1f} kW, accu {d.get('battery_soc', '?')}%{extra_tekst}"}
+            let_op = (f" LET OP: op {ip} antwoordde niets, maar de omvormer zit nu op {echt.GEVONDEN[ip]}. Vul dat adres in en zet in je router "
+                      "een vast IP-adres voor de omvormer.") if echt.GEVONDEN.get(ip) else ""
+            return {"ok": True, "tekst": f"{inv.model_name}: zon {(d.get('ppv') or 0) / 1000:.1f} kW, accu {d.get('battery_soc', '?')}%{extra_tekst}.{let_op}" if let_op
+                    else f"{inv.model_name}: zon {(d.get('ppv') or 0) / 1000:.1f} kW, accu {d.get('battery_soc', '?')}%{extra_tekst}"}
         from .apparaten import merken as mk
         driver = {"fronius": echt.Fronius, "sunspec": echt.SunSpec, "homewizard": echt.HomeWizardP1, "youless": echt.Youless,
                   "p1monitor": echt.P1Monitor, "shelly_em": echt.ShellyEM, "goe": echt.GoE, "solaredge": mk.SolarEdge,

@@ -1,3 +1,7 @@
+## 1.25.0
+
+- **De omvormer wordt teruggevonden als hij van IP-adres verandert.** Geeft je router de GoodWe een ander adres, dan kreeg je "geen verbinding" en kon het brein de accu niet meer sturen. Nu zoekt het brein zelf op het netwerk naar de wifi-module en gebruikt het nieuwe adres. Dat staat in het Logboek, en de Test-knop bij Koppelen meldt het ook. Zet in je router wel een vast IP-adres voor de omvormer en pas het adres bij Koppelen aan, want zo vind je hem sneller.
+
 ## 1.24.0
 
 - **Minder valse meldingen over de omvormer.** Wisselt de GoodWe van stand (bijvoorbeeld aan het begin van de avondpiek van eigen verbruik naar een ontlaadschema), dan heeft hij soms een paar minuten nodig om een nieuwe opdracht over te nemen. Je kreeg daar een "Accu doet iets anders dan Energiebrein vraagt" voor, ook als het zichzelf even later oploste. Nu komt die melding pas als de omvormer minstens 5 minuten op de verkeerde stand blijft staan; het brein blijft de opdracht intussen opnieuw sturen. Een andere EMS-modus (iets van een andere partij) wordt nog steeds meteen gemeld.

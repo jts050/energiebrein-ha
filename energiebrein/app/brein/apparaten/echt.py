@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -24,6 +25,22 @@ async def _poort_open(host: str, poort: int, wacht: float = 2.0) -> bool:
         return False
 
 
+GEVONDEN: dict[str, str] = {}      # ingesteld IP-adres -> adres waar de omvormer in werkelijkheid bleek te zitten
+
+
+async def _wifi_modules_in_de_buurt(behalve: str) -> list[str]:
+    """IP-adressen van GoodWe-wifimodules die op een zoekvraag (UDP-broadcast) antwoorden. Het IP-adres van de omvormer kan
+    veranderen als je router hem een ander adres geeft; dan staat het ingestelde adres er niet meer."""
+    try:
+        import goodwe
+        antwoord = await asyncio.wait_for(goodwe.search_inverters(), timeout=8)
+    except Exception as e:
+        log.info("Zoeken naar een GoodWe in de buurt lukt niet: %s", e)
+        return []
+    ips = re.findall(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b", antwoord.decode("utf-8", "ignore"))
+    return [ip for ip in dict.fromkeys(ips) if ip != behalve][:3]
+
+
 async def goodwe_verbind(host: str, familie: str | None = None):
     """GoodWe kan op twee manieren lokaal praten: UDP poort 8899 (wifi-module) of Modbus TCP poort 502 (LAN-module en
     nieuwere modules). We proberen beide, met een ruimere wachttijd dan standaard (via een wifi-versterker duurt het
@@ -39,6 +56,16 @@ async def goodwe_verbind(host: str, familie: str | None = None):
         except Exception as e:
             fouten.append(f"poort {poort}: {type(e).__name__}")
             log.warning("GoodWe via poort %s lukt niet: %s", poort, e)
+    # Niets op het ingestelde adres. Misschien heeft de router de omvormer een ander adres gegeven: even rondkijken.
+    for ip in await _wifi_modules_in_de_buurt(host):
+        try:
+            inv = await asyncio.wait_for(goodwe.connect(ip, port=8899, family=familie or None, timeout=3, retries=2), timeout=30)
+        except Exception as e:
+            fouten.append(f"{ip}: {type(e).__name__}")
+            continue
+        GEVONDEN[host] = ip
+        log.warning("GoodWe antwoordt niet op %s, maar is gevonden op %s; ik gebruik dat adres", host, ip)
+        return inv
     raise GoodWeNietBereikbaar(host, fouten)
 
 
@@ -94,6 +121,10 @@ class GoodWe:
     async def start(self):
         self.inv = await goodwe_verbind(self.host, self.cfg["omvormer"].get("goodwe_familie"))
         log.info("GoodWe verbonden: %s %s", self.inv.model_name, self.inv.serial_number)
+        nieuw = GEVONDEN.get(self.host)
+        if nieuw and self.logboek:
+            self.logboek.schrijf("systeem", f"De GoodWe antwoordde niet op {self.host} maar is gevonden op {nieuw}; Energiebrein gebruikt dat adres. "
+                                 "Zet in je router een vast IP-adres voor de omvormer en pas het adres aan bij Koppelen.", "omvormer")
         # Stond de accu nog in stand-by van een vorige keer (bijv. pc uitgevallen)? Dan eerst terug naar automatisch.
         try:
             from goodwe import EMSMode
