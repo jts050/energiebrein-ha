@@ -116,16 +116,26 @@ async def _udp_dongles() -> list[dict]:
         log.info("Geen wifi-module gevonden via broadcast (%s)", e)
         return []
     uit = []
-    for regel in antwoord.decode("utf-8", "ignore").splitlines() or [antwoord.decode("utf-8", "ignore")]:
-        m = re.search(r"(\d+\.\d+\.\d+\.\d+)", regel)
+    for regel in antwoord.decode("utf-8", "ignore").splitlines():
+        m = re.search(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b", regel)
         if not m:
             continue
-        delen = [d.strip() for d in regel.split(",")]
-        naam = delen[-1] if len(delen) > 2 else ""
-        if "solar-wifi" in regel.lower() or "goodwe" in regel.lower() or not naam:
-            uit.append(_vondst("omvormer", "GoodWe", m.group(1), naam or "GoodWe-omvormer", {"omvormer": "goodwe"}, "UDP"))
+        try:
+            ip = str(ipaddress.IPv4Address(m.group(1)))
+        except ValueError:
+            continue
+        # De zoekvraag wordt ook door andere wifi-modules beantwoord. Controleer
+        # de omvormer zelf voordat we een merk of koppeling aanbieden.
+        try:
+            inv = await asyncio.wait_for(
+                goodwe.connect(ip, port=8899, timeout=1, retries=1), timeout=15)
+        except Exception as e:
+            log.info("Wifi-module op %s gevonden, GoodWe niet bevestigd: %s", ip, e)
+            uit.append(_vondst("omvormer", "Wifi-module (niet herkend)", ip,
+                               "Controleer dit adres bij de fabrikant", None, "UDP"))
         else:
-            uit.append(_vondst("omvormer", "Growatt / Solis / Deye / Sofar", m.group(1), naam, None, "UDP"))
+            naam = getattr(inv, "model_name", None) or "GoodWe-omvormer"
+            uit.append(_vondst("omvormer", "GoodWe", ip, naam, {"omvormer": "goodwe"}, "UDP"))
     return uit
 
 

@@ -1,3 +1,9 @@
+## 1.25.1
+
+- De netwerkzoeker controleert of een wifi-module daadwerkelijk een GoodWe is voordat hij die als GoodWe aanbiedt. Een onbevestigde module blijft zichtbaar als zoekresultaat.
+- Bij een gewijzigd IP-adres verbindt het brein alleen automatisch als het serienummer overeenkomt met de eerder verbonden omvormer. Is dat nummer nog niet bekend, controleer dan het voorgestelde adres zelf bij Koppelen.
+- De foutmelding geeft aanwijzingen voor Home Assistant, de router en de lokale verbinding; een werkend SEMS-portaal bewijst niet dat lokaal uitlezen werkt.
+
 ## 1.25.0
 
 - **De omvormer wordt teruggevonden als hij van IP-adres verandert.** Geeft je router de GoodWe een ander adres, dan kreeg je "geen verbinding" en kon het brein de accu niet meer sturen. Nu zoekt het brein zelf op het netwerk naar de wifi-module en gebruikt het nieuwe adres. Dat staat in het Logboek, en de Test-knop bij Koppelen meldt het ook. Zet in je router wel een vast IP-adres voor de omvormer en pas het adres bij Koppelen aan, want zo vind je hem sneller.

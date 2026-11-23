@@ -817,7 +817,7 @@ main{padding-top:max(30px,env(safe-area-inset-top))}
           <label class="schakel"><input type="checkbox" id="k-sim" form="kform"><span>Simulatie</span></label>
         </div>
         <div class="zoekbalk">
-          <div><b>Apparaten zoeken</b><span>Vindt omvormers, meters, laadpalen en relais in je wifi. Duurt 10 tot 20 seconden.</span></div>
+          <div><b>Apparaten zoeken</b><span>Vindt omvormers, meters, laadpalen en relais in je netwerk. Dit kan een halve minuut duren.</span></div>
           <button class="btn vol" type="button" id="zoek">Zoek in mijn netwerk</button>
         </div>
         <p class="note" id="zoekstatus"></p>
@@ -1815,7 +1815,7 @@ async function laadCatalogus(){if(CAT)return;CAT=await api('/api/catalogus');
 function catInfo(merk){return CAT&&CAT.merken.find(m=>m.merk===merk);}
 $('zoek').onclick=async()=>{
   await laadCatalogus();
-  $('zoek').disabled=true;$('zoekstatus').textContent='Zoeken… dit duurt 10 tot 20 seconden';$('found').innerHTML='';
+  $('zoek').disabled=true;$('zoekstatus').textContent='Zoeken… dit kan een halve minuut duren';$('found').innerHTML='';
   try{const r=await api('/api/zoek',{});
     $('zoekstatus').textContent=r.gevonden.length?`${r.gevonden.length} apparaten gevonden in ${r.netwerk||'je netwerk'}`:'Niets gevonden. Zit dit apparaat in hetzelfde wifi-netwerk als je installatie? Je kunt het IP-adres ook zelf invullen (staat in de app van het apparaat of in je router).';
     r.gevonden.forEach(x=>{const li=document.createElement('li');
@@ -1831,6 +1831,7 @@ $('zoek').onclick=async()=>{
         if(/shelly/i.test(x.merk))knop('Als slimme meter',()=>vervangP1('shelly_em',x.ip));}
       else if(k.laadpaal)knop('Koppel',()=>{$('k-lp-type').value=k.laadpaal;$('k-lp-host').value=x.ip;toon();});
       else if(x.soort==='relais'){knop('Meter warmtepomp',()=>{if($('k-wp-type').value==='uit')$('k-wp-type').value='meter';$('k-wp-meter').value=x.ip;toon();});knop('Warmtepomp relais 1',()=>{$('k-wp-type').value='sgready_shelly';$('k-wp-r1').value=x.ip;toon();});knop('Relais 2',()=>{$('k-wp-type').value='sgready_shelly';$('k-wp-r2').value=x.ip;toon();});}
+      else if(x.merk==='Wifi-module (niet herkend)'){const sp=document.createElement('span');sp.className='note';sp.textContent='Wifi-module gevonden, maar de omvormer antwoordde niet op de lokale verbinding. Controleer het IP-adres in je router en test het bij Koppelen.';li.appendChild(sp);}
       else{const c=catInfo(x.merk);const sp=document.createElement('span');sp.className='note';
         sp.textContent=c&&c.status==='ocpp'?'Koppel via OCPP: zie Laadpaal hieronder':(c?CAT.status[c.status]+' · '+c.hoe:'Herkend, koppeling volgt');li.appendChild(sp);
         if(c&&c.status==='ocpp')knop('Kies OCPP',()=>{$('k-lp-type').value='ocpp';toon();});}

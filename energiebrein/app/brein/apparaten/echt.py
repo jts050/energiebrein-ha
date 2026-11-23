@@ -25,6 +25,7 @@ async def _poort_open(host: str, poort: int, wacht: float = 2.0) -> bool:
         return False
 
 
+BEKENDE_SERIENUMMERS: dict[str, str] = {}  # alleen na een geslaagde verbinding op het ingestelde adres
 GEVONDEN: dict[str, str] = {}      # ingesteld IP-adres -> adres waar de omvormer in werkelijkheid bleek te zitten
 
 
@@ -46,22 +47,32 @@ async def goodwe_verbind(host: str, familie: str | None = None):
     nieuwere modules). We proberen beide, met een ruimere wachttijd dan standaard (via een wifi-versterker duurt het
     antwoord soms langer dan 1 seconde). Lukt niets, dan een melding in gewone taal met wat je kunt controleren."""
     import goodwe
+    GEVONDEN.pop(host, None)
     pogingen, fouten = [], []
     if await _poort_open(host, 502):
         pogingen.append(502)
     pogingen += [8899] + ([] if 502 in pogingen else [502])
     for poort in pogingen:
         try:
-            return await asyncio.wait_for(goodwe.connect(host, port=poort, family=familie or None, timeout=3, retries=3), timeout=60)
+            inv = await asyncio.wait_for(goodwe.connect(host, port=poort, family=familie or None, timeout=3, retries=3), timeout=60)
+            if getattr(inv, "serial_number", None):
+                BEKENDE_SERIENUMMERS[host] = inv.serial_number
+            return inv
         except Exception as e:
             fouten.append(f"poort {poort}: {type(e).__name__}")
             log.warning("GoodWe via poort %s lukt niet: %s", poort, e)
     # Niets op het ingestelde adres. Misschien heeft de router de omvormer een ander adres gegeven: even rondkijken.
     for ip in await _wifi_modules_in_de_buurt(host):
+        if not BEKENDE_SERIENUMMERS.get(host):
+            fouten.append(f"mogelijke wifi-module op {ip}; controleer dit adres zelf bij Koppelen")
+            continue
         try:
             inv = await asyncio.wait_for(goodwe.connect(ip, port=8899, family=familie or None, timeout=3, retries=2), timeout=30)
         except Exception as e:
             fouten.append(f"{ip}: {type(e).__name__}")
+            continue
+        if getattr(inv, "serial_number", None) != BEKENDE_SERIENUMMERS[host]:
+            fouten.append(f"{ip}: serienummer komt niet overeen")
             continue
         GEVONDEN[host] = ip
         log.warning("GoodWe antwoordt niet op %s, maar is gevonden op %s; ik gebruik dat adres", host, ip)
@@ -81,13 +92,12 @@ def _eigen_ip_tekst() -> str:
 class GoodWeNietBereikbaar(RuntimeError):
     def __init__(self, host, fouten):
         self.host, self.fouten = host, fouten
-        net = ".".join(host.split(".")[:3]) + "."
         super().__init__(
-            f"De GoodWe op {host} geeft geen antwoord op de lokale verbinding. Controleer: "
-            "1) Windows-firewall: sta Python toe op privénetwerken (Windows-beveiliging → Firewall en netwerkbeveiliging → "
-            "Een app toestaan via de firewall → python.exe, vinkje bij Privé). "
-            f"2) Zit deze computer op hetzelfde netwerk als de omvormer? Het IP-adres van deze computer moet ook met {net} beginnen{_eigen_ip_tekst()}. "
-            "3) Sommige nieuwere GoodWe-wifimodules staan lokaal uitlezen niet toe; dan werkt het alleen via een LAN-module met netwerkkabel. "
+            f"De GoodWe op {host} geeft lokaal geen antwoord. Controleer in je router of de "
+            "wifi-module verbonden is en welk IP-adres hij nu heeft. Test dat adres bij Koppelen. "
+            "Controleer ook of Home Assistant en de omvormer elkaar op het netwerk kunnen bereiken. "
+            "SEMS kan nog werken terwijl de lokale verbinding niet werkt. Herstart zo nodig de "
+            "wifi-module volgens de instructies van GoodWe of je installateur. "
             f"(Geprobeerd: {', '.join(fouten)})")
 
 

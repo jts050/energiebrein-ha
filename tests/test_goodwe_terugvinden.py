@@ -35,6 +35,7 @@ def _patch(monkeypatch, zoek, bereikbaar):
     monkeypatch.setattr(goodwe, "search_inverters", search)
     monkeypatch.setattr(echt, "_poort_open", dicht)
     echt.GEVONDEN.clear()
+    echt.BEKENDE_SERIENUMMERS.clear()
     return pogingen
 
 
@@ -47,6 +48,7 @@ def test_gewoon_verbinden_zoekt_niets(monkeypatch):
 
 def test_nieuw_adres_wordt_gevonden(monkeypatch):
     _patch(monkeypatch, b"192.168.2.77,AABBCC,Solar-WiFi", {"192.168.2.77"})
+    echt.BEKENDE_SERIENUMMERS["192.168.2.5"] = "123"
     inv = asyncio.run(echt.goodwe_verbind("192.168.2.5"))
     assert inv.serial_number == "123"
     assert echt.GEVONDEN == {"192.168.2.5": "192.168.2.77"}
@@ -87,6 +89,7 @@ def test_start_zet_het_in_het_logboek_en_de_testknop_meldt_het(monkeypatch):
 
     _patch(monkeypatch, b"192.168.2.77,AA,Solar-WiFi", {"192.168.2.77"})
 
+    echt.BEKENDE_SERIENUMMERS["192.168.2.5"] = "123"
     class Inv(_Inv):
         async def get_ems_mode(self):
             return None
@@ -100,3 +103,27 @@ def test_start_zet_het_in_het_logboek_en_de_testknop_meldt_het(monkeypatch):
     g.logboek = Log()
     asyncio.run(g.start())
     assert any("192.168.2.77" in r and "vast IP" in r for r in g.logboek.regels)
+
+
+def test_onbekend_serienummer_verbindt_niet_automatisch(monkeypatch):
+    p = _patch(monkeypatch, b"192.168.2.77,AA,Solar-WiFi", {"192.168.2.77"})
+    with pytest.raises(echt.GoodWeNietBereikbaar) as exc:
+        asyncio.run(echt.goodwe_verbind("192.168.2.5"))
+    assert "192.168.2.77" in str(exc.value)
+    assert all(host != "192.168.2.77" for host, _ in p)
+
+
+def test_ander_serienummer_wordt_niet_gebruikt(monkeypatch):
+    _patch(monkeypatch, b"192.168.2.77,AA,Solar-WiFi", {"192.168.2.77"})
+    echt.BEKENDE_SERIENUMMERS["192.168.2.5"] = "andere-omvormer"
+    with pytest.raises(echt.GoodWeNietBereikbaar, match="serienummer"):
+        asyncio.run(echt.goodwe_verbind("192.168.2.5"))
+    assert not echt.GEVONDEN
+
+
+def test_direct_verbonden_verwijdert_verouderd_zoekresultaat(monkeypatch):
+    _patch(monkeypatch, b"", {"192.168.2.5"})
+    echt.GEVONDEN["192.168.2.5"] = "192.168.2.77"
+    asyncio.run(echt.goodwe_verbind("192.168.2.5"))
+    assert not echt.GEVONDEN
+    assert echt.BEKENDE_SERIENUMMERS["192.168.2.5"] == "123"
